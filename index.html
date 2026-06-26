@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataVeil 数据面纱 — 隐私优先的PII数据脱敏工具</title>
+<style>
+/* ═══════════════════════════════════════════════
+   DATA VEIL — DESIGN SYSTEM
+   ═══════════════════════════════════════════════ */
+:root {
+  --primary: #3b82f6; --primary-dark: #1d4ed8;
+  --accent: #2563eb; --accent-light: #eff6ff;
+  --bg: #f1f5f9; --card: rgba(255,255,255,0.82);
+  --card-solid: #ffffff;
+  --border: rgba(148,163,184,0.25); --text: #0f172a; --muted: #64748b;
+  --success: #16a34a; --danger: #dc2626; --warning: #d97706;
+  --masked-bg: #fef2f2; --masked-border: #fecaca;
+  --pii-tag-bg: #fef3c7; --pii-tag-text: #92400e;
+  --radius: 20px; --radius-sm: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.08), 0 4px 6px rgba(0,0,0,0.04);
+  --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+  --glass-blur: blur(14px);
+}
+[data-theme="dark"] {
+  --primary: #60a5fa; --primary-dark: #3b82f6;
+  --accent: #6366f1; --accent-light: #1e1b4b;
+  --bg: #0b1120; --card: rgba(30,41,59,0.75);
+  --card-solid: #1e293b;
+  --border: rgba(71,85,105,0.4); --text: #f1f5f9; --muted: #94a3b8;
+  --success: #22c55e; --danger: #ef4444; --warning: #f59e0b;
+  --masked-bg: #450a0a; --masked-border: #7f1d1d;
+  --pii-tag-bg: #451a03; --pii-tag-text: #fbbf24;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.5), 0 4px 6px rgba(0,0,0,0.3);
+  --glass-blur: blur(18px);
+}
+
+/* ═══════════ RESET & BASE ═══════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.6;
+  -webkit-font-smoothing: antialiased; min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+  position: relative;
+}
+/* Subtle grid pattern for depth */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; opacity: 0.03;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+a { color: var(--primary); text-decoration: none; }
+
+/* ═══════════ LAYOUT ═══════════ */
+.container { max-width: 1280px; margin: 0 auto; padding: 16px 20px; }
+
+/* ═══════════ HEADER ═══════════ */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; margin-bottom: 16px;
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  transition: all var(--transition);
+}
+.header-brand { display: flex; align-items: center; gap: 10px; }
+.header-logo { font-size: 32px; }
+.header-title { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+.header-subtitle { font-size: 13px; color: var(--muted); font-weight: 500; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.data-badge {
+  display: none; align-items: center; gap: 6px;
+  padding: 6px 14px; background: var(--accent-light);
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  transition: background var(--transition);
+}
+
+/* ═══════════ THEME TOGGLE ═══════════ */
+.theme-toggle {
+  width: 40px; height: 40px; border: 2px solid var(--border);
+  border-radius: 50%; background: var(--card); cursor: pointer;
+  font-size: 20px; display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+}
+.theme-toggle:hover { border-color: var(--primary); transform: rotate(15deg); }
+
+/* ═══════════ UPLOAD ZONE ═══════════ */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 40px 20px; text-align: center; cursor: pointer;
+  transition: all 0.3s; position: relative;
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  margin-bottom: 16px;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary); background: var(--accent-light);
+}
+.upload-zone.idle { animation: uploadBreathe 3s ease-in-out infinite; }
+.upload-icon { font-size: 42px; margin-bottom: 8px; opacity: 0.8; }
+.upload-text { font-size: 15px; font-weight: 600; }
+.upload-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.upload-zone.has-data { padding: 16px 20px; text-align: left; }
+.upload-zone.has-data .upload-icon { font-size: 24px; margin-bottom: 0; }
+.upload-zone.has-data .upload-text { font-size: 13px; }
+
+/* ═══════════ STATS BAR ═══════════ */
+.stats-bar {
+  display: none; flex-wrap: wrap; gap: 16px; padding: 12px 20px;
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); margin-bottom: 16px;
+  font-size: 13px; color: var(--muted);
+}
+.stats-bar.visible { display: flex; }
+.stat-item { display: flex; align-items: center; gap: 4px; }
+.stat-value { font-weight: 700; color: var(--primary); font-size: 15px; }
+
+/* ═══════════ TABS ═══════════ */
+.tabs {
+  display: none; gap: 4px; margin-bottom: 12px;
+}
+.tabs.visible { display: flex; }
+.tab-btn {
+  padding: 10px 22px; border: 1px solid var(--border);
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 14px; font-weight: 500;
+  transition: all var(--transition); color: var(--muted);
+}
+.tab-btn:hover { border-color: var(--primary); color: var(--primary); }
+.tab-btn.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+
+/* ═══════════ TOOLBAR ═══════════ */
+.toolbar {
+  display: none; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-bottom: 12px;
+}
+.toolbar.visible { display: flex; }
+.btn {
+  padding: 8px 18px; border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 500; background: var(--card);
+  color: var(--text); transition: all var(--transition);
+  white-space: nowrap;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn-primary {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outline { background: transparent; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-download {
+  margin-left: auto; background: var(--success); color: #fff;
+  border-color: var(--success);
+}
+.btn-download:hover { background: #16a34a; }
+
+/* ═══════════ TABLE ═══════════ */
+.table-wrapper {
+  display: none; max-height: 520px; overflow: auto;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow);
+}
+.table-wrapper.visible { display: block; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
+thead { position: sticky; top: 0; z-index: 2; }
+th {
+  background: var(--accent-light); padding: 10px 12px;
+  text-align: left; font-weight: 600; white-space: nowrap;
+  border-bottom: 2px solid var(--border); cursor: pointer;
+  user-select: none; font-size: 12px;
+  transition: background var(--transition);
+}
+th:hover { background: var(--primary); color: #fff; }
+th .pii-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 4px; vertical-align: middle;
+}
+td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: background var(--transition);
+}
+tbody tr { animation: rowFadeIn 0.3s ease both; }
+tbody tr:hover { background: var(--accent-light); }
+.masked-cell {
+  background: var(--masked-bg) !important;
+  cursor: help; position: relative;
+  font-weight: 500;
+}
+.masked-cell:hover { background: var(--masked-border) !important; }
+.audit-reveal {
+  background: rgba(239,68,68,0.12) !important;
+  border: 1px dashed rgba(239,68,68,0.3);
+}
+
+/* ═══════════ PAGINATION ═══════════ */
+.pagination {
+  display: none; align-items: center; justify-content: center;
+  gap: 12px; padding: 10px; font-size: 13px;
+}
+.pagination.visible { display: flex; }
+.pagination button {
+  padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--card);
+  cursor: pointer; color: var(--text);
+  transition: all var(--transition);
+}
+.pagination button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pagination button:disabled { opacity: 0.4; cursor: default; }
+
+/* ═══════════ RULES PANEL ═══════════ */
+.rules-panel { display: none; }
+.rules-panel.visible { display: block; }
+.rules-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rules-table th { cursor: default; }
+.rules-table th:hover { background: var(--accent-light); color: var(--text); }
+.rules-table td { padding: 10px 12px; vertical-align: middle; }
+.rules-table select {
+  padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; background: var(--card);
+  color: var(--text); cursor: pointer;
+}
+.rules-table select:focus { outline: none; border-color: var(--primary); }
+.confidence-bar {
+  display: inline-block; height: 6px; border-radius: 3px;
+  min-width: 40px; vertical-align: middle; margin-right: 4px;
+}
+.preview-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; background: var(--masked-bg); color: var(--danger);
+  margin-left: 4px;
+}
+.toggle-switch {
+  position: relative; display: inline-block; width: 44px; height: 24px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc; border-radius: 24px; transition: var(--transition);
+}
+.toggle-slider::before {
+  content: ""; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
+  transition: var(--transition);
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--success); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+/* ═══════════ RING CONFIDENCE ═══════════ */
+.ring-conf { display: inline-flex; align-items: center; gap: 6px; }
+.ring-conf svg { vertical-align: middle; }
+
+/* ═══════════ THREE-STATE MODE BUTTONS ═══════════ */
+.mode-group { display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.mode-btn {
+  padding: 5px 10px; border: none; background: var(--card); color: var(--muted);
+  cursor: pointer; font-size: 11px; font-weight: 500; white-space: nowrap;
+  transition: all var(--transition);
+}
+.mode-btn:not(:last-child) { border-right: 1px solid var(--border); }
+.mode-btn:hover { background: var(--accent-light); color: var(--text); }
+.mode-btn.active { background: var(--primary); color: #fff; }
+.mode-btn.active.danger { background: var(--danger); }
+
+/* ═══════════ COLLAPSIBLE RULE ROW ═══════════ */
+.rules-table tbody tr { cursor: pointer; }
+.rules-table tbody tr:hover { background: var(--accent-light); }
+.rule-detail { display: none; }
+.rule-detail.open { display: table-row; background: var(--accent-light); }
+.rule-detail td { padding: 12px 20px; font-size: 12px; color: var(--muted); }
+
+/* ═══════════ STATS PANEL ═══════════ */
+.stats-panel { display: none; }
+.stats-panel.visible { display: block; }
+.stats-panel .card { margin-bottom: 12px; }
+.stats-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.stats-row:last-child { border-bottom: none; }
+.stats-row-icon { font-size: 20px; width: 32px; text-align: center; }
+.stats-row-info { flex: 1; }
+.stats-row-name { font-weight: 600; font-size: 14px; }
+.stats-row-count { font-size: 12px; color: var(--muted); }
+.stats-bar-wrap { flex: 2; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+.stats-bar-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+.stats-row-pct { width: 50px; text-align: right; font-weight: 700; font-size: 13px; }
+
+/* ═══════════ CARD ═══════════ */
+.card {
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+  transition: all var(--transition);
+}
+
+/* ═══════════ EMPTY STATE ═══════════ */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 20px; color: var(--muted);
+  text-align: center;
+}
+.empty-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.6; }
+.empty-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.empty-desc { font-size: 13px; }
+
+/* ═══════════ MODAL ═══════════ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  justify-content: center; align-items: center; animation: fadeIn 0.2s ease;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 640px; width: 90%; max-height: 80vh;
+  overflow-y: auto; box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s ease;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  width: 32px; height: 32px; border: none; border-radius: 50%;
+  background: transparent; cursor: pointer; font-size: 20px;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all var(--transition);
+}
+.modal-close:hover { background: var(--danger); color: #fff; }
+.modal-body { padding: 20px; }
+
+/* ═══════════ TOAST ═══════════ */
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  padding: 12px 28px; border-radius: var(--radius-sm);
+  background: #1e293b; color: #fff; font-size: 14px;
+  z-index: 2000; pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  animation: toastIn 0.35s ease;
+}
+.toast.success { background: #16a34a; }
+.toast.warn { background: #b45309; }
+
+/* ═══════════ FOOTER ═══════════ */
+.footer {
+  text-align: center; padding: 24px; margin-top: 20px;
+  font-size: 12px; color: var(--muted);
+}
+
+/* ═══════════ ANIMATIONS ═══════════ */
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+@keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(16px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+@keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(-50%) translateY(-8px)} }
+@keyframes uploadBreathe {
+  0%,100%{border-color:var(--primary);box-shadow:0 0 0 0 rgba(59,130,246,0.15)}
+  50%{border-color:var(--accent);box-shadow:0 0 0 8px rgba(59,130,246,0)}
+}
+@keyframes badgeIn { from{opacity:0;transform:scale(0.8)} to{opacity:1;transform:scale(1)} }
+@keyframes rowFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+
+/* ═══════════ LOADING OVERLAY ═══════════ */
+.loading-overlay {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(15,23,42,0.5); backdrop-filter: blur(8px);
+  justify-content: center; align-items: center;
+}
+.loading-overlay.visible { display: flex; }
+.loading-card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 32px 48px; text-align: center;
+  box-shadow: var(--shadow-lg); animation: slideUp 0.3s ease;
+}
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 0.8s linear infinite;
+}
+.loading-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.loading-progress { font-size: 13px; color: var(--muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════ AUDIT MODE ═══════════ */
+.btn-audit {
+  background: transparent; color: var(--danger); border-color: var(--danger);
+  font-weight: 600;
+}
+.btn-audit:hover { background: var(--danger); color: #fff; }
+.btn-audit.active {
+  background: var(--danger); color: #fff; animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ═══════════ WATERMARK ═══════════ */
+.watermark-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 100px,
+    rgba(239,68,68,0.03) 100px,
+    rgba(239,68,68,0.03) 200px
+  );
+}
+.watermark-overlay.visible { display: block; }
+.watermark-text {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-20deg);
+  font-size: 64px; font-weight: 900; color: rgba(239,68,68,0.08);
+  white-space: nowrap; letter-spacing: 12px;
+  user-select: none;
+}
+.watermark-warn {
+  position: fixed; bottom: 80px; left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px; background: rgba(239,68,68,0.9);
+  color: #fff; font-size: 13px; font-weight: 600;
+  border-radius: 20px; animation: pulse 1s ease-in-out infinite;
+  pointer-events: auto; user-select: none;
+}
+
+/* ═══════════ CONFIRM CHECKBOX ═══════════ */
+.confirm-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px; margin-top: 8px;
+  background: var(--masked-bg); border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.confirm-check input { width: 18px; height: 18px; cursor: pointer; }
+
+/* ═══════════ LAYOUT GRID ═══════════ */
+.layout {
+  display: none; gap: 16px;
+}
+.layout.visible {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+}
+.sidebar { display: flex; flex-direction: column; gap: 12px; }
+.main-area { display: flex; flex-direction: column; min-width: 0; }
+
+/* ═══════════ SIDEBAR CARDS ═══════════ */
+.sidebar-card {
+  background: var(--card); backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow);
+  transition: all var(--transition);
+}
+.sidebar-card h4 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted); margin-bottom: 10px;
+}
+.sidebar-stat { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.sidebar-stat-label { font-size: 13px; color: var(--muted); }
+.sidebar-stat-value { font-size: 16px; font-weight: 700; color: var(--primary); }
+.sidebar-actions { display: flex; flex-direction: column; gap: 6px; }
+.sidebar-actions .btn { text-align: center; }
+
+/* ═══════════ COMPACT UPLOAD ═══════════ */
+.upload-zone.compact { padding: 12px 20px; margin-bottom: 12px; }
+.upload-zone.compact .upload-icon { font-size: 20px; margin-bottom: 0; }
+.upload-zone.compact .upload-text { font-size: 13px; }
+.upload-zone.compact .upload-hint { display: none; }
+
+/* ═══════════ RESPONSIVE LAYOUT ═══════════ */
+@media (max-width: 900px) {
+  .layout.visible { grid-template-columns: 1fr; }
+  .sidebar { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .sidebar-card { flex: 1; min-width: 140px; }
+  .sidebar-actions { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 900px) {
+  .container { padding: 10px 12px; }
+  .header { flex-wrap: wrap; gap: 8px; }
+  .toolbar { gap: 4px; }
+  .toolbar .btn { padding: 6px 10px; font-size: 12px; }
+  th, td { padding: 6px 8px; font-size: 11px; }
+  .tab-btn { padding: 8px 12px; font-size: 12px; }
+  .rules-table td { padding: 8px 6px; }
+  .rules-table select { font-size: 11px; padding: 4px 6px; }
+}
+@media (max-width: 480px) {
+  .header-title { font-size: 16px; }
+  .stats-bar { gap: 8px; font-size: 11px; }
+  .stats-bar .stat-value { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- ═══════════ HEADER ═══════════ -->
+  <div class="header">
+    <div class="header-brand">
+      <span class="header-logo">🛡️</span>
+      <div>
+        <div class="header-title">DataVeil <span style="font-weight:400;font-size:15px;">数据面纱</span></div>
+        <div class="header-subtitle">隐私优先的PII数据脱敏工具</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="data-badge" id="dataBadge">📊 就绪</span>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
+  </div>
+
+  <!-- ═══════════ UPLOAD ZONE ═══════════ -->
+  <div class="upload-zone idle" id="uploadZone">
+    <div class="upload-icon">📂</div>
+    <div class="upload-text">拖拽 Excel / CSV 文件到此处 或 点击选择</div>
+    <div class="upload-hint">支持 .xlsx · .xls · .csv ｜ 数据不上传服务器，全部本地处理</div>
+    <input type="file" id="fileInput" hidden accept=".xlsx,.xls,.csv" multiple>
+  </div>
+
+  <!-- ═══════════ LAYOUT GRID ═══════════ -->
+  <div class="layout" id="layout">
+    <!-- ── SIDEBAR ── -->
+    <div class="sidebar">
+      <div class="sidebar-card">
+        <h4>📊 数据概览</h4>
+        <div class="sidebar-stat"><span class="sidebar-stat-label">总行数</span><span class="sidebar-stat-value" id="statRows">0</span></div>
+        <div class="sidebar-stat"><span class="sidebar-stat-label">已脱敏</span><span class="sidebar-stat-value" id="statPII">0</span></div>
+        <div class="sidebar-stat"><span class="sidebar-stat-label">列数</span><span class="sidebar-stat-value" id="statCols">0</span></div>
+        <div class="sidebar-stat"><span class="sidebar-stat-label">PII类型</span><span class="sidebar-stat-value" id="statTypes">0</span></div>
+      </div>
+      <div class="sidebar-card">
+        <h4>⚡ 快捷操作</h4>
+        <div class="sidebar-actions">
+          <button class="btn btn-sm" id="presetAll">🔒 全部打码</button>
+          <button class="btn btn-sm" id="presetIDPhone">🆔📱 仅身份证+手机</button>
+          <button class="btn btn-sm" id="presetReset">🔄 重置检测</button>
+          <button class="btn btn-sm btn-download" id="btnDownload">📥 下载脱敏文件</button>
+        </div>
+      </div>
+      <div class="sidebar-card" style="overflow:hidden">
+        <h4>📝 操作日志</h4>
+        <div id="logList" style="max-height:200px;overflow-y:auto;font-size:11px;color:var(--muted)">
+          <div style="text-align:center;padding:8px">等待操作…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MAIN AREA ── -->
+    <div class="main-area">
+      <div class="tabs" id="tabs">
+        <button class="tab-btn active" data-tab="preview">📋 数据预览</button>
+        <button class="tab-btn" data-tab="rules">⚙ 脱敏规则</button>
+        <button class="tab-btn" data-tab="stats">📊 统计报告</button>
+        <button class="tab-btn" data-tab="dashboard">🔒 安全仪表盘</button>
+      </div>
+
+      <div class="toolbar" id="toolbar">
+        <button class="btn btn-sm btn-audit" id="btnAudit">👁 审核模式</button>
+      </div>
+
+      <!-- TAB: PREVIEW -->
+      <div class="tab-content" id="tab-preview">
+        <div class="empty-state" id="previewEmpty">
+          <div class="empty-icon">📂</div>
+          <div class="empty-title">请上传文件</div>
+          <div class="empty-desc">上传 Excel 或 CSV 文件后，数据预览将在此显示</div>
+        </div>
+        <div class="table-wrapper" id="tableWrapper">
+          <table id="dataTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination">
+          <button id="btnPrev">« 上一页</button>
+          <span id="pageInfo">第 1/1 页</span>
+          <button id="btnNext">下一页 »</button>
+        </div>
+      </div>
+
+      <!-- TAB: RULES -->
+      <div class="tab-content rules-panel" id="tab-rules" style="display:none">
+        <div class="empty-state" id="rulesEmpty">
+          <div class="empty-icon">⚙</div>
+          <div class="empty-title">请先上传文件</div>
+          <div class="empty-desc">上传文件后将自动检测PII列，在此配置脱敏规则</div>
+        </div>
+        <div class="card" id="rulesCard" style="display:none">
+          <table class="rules-table">
+            <thead><tr><th>列名</th><th>检测类型</th><th>置信度</th><th>脱敏模式</th><th>预览</th><th>启用</th></tr></thead>
+            <tbody id="rulesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: STATS -->
+      <div class="tab-content stats-panel" id="tab-stats" style="display:none">
+        <div class="empty-state" id="statsEmpty">
+          <div class="empty-icon">📊</div>
+          <div class="empty-title">请先上传文件</div>
+          <div class="empty-desc">上传文件后将显示脱敏统计报告</div>
+        </div>
+        <div class="card" id="statsCard" style="display:none">
+          <div id="statsContent"></div>
+        </div>
+      </div>
+
+      <!-- TAB: DASHBOARD -->
+      <div class="tab-content" id="tab-dashboard" style="display:none">
+        <div class="empty-state" id="dashEmpty">
+          <div class="empty-icon">🔒</div>
+          <div class="empty-title">请先上传文件</div>
+          <div class="empty-desc">上传文件后将显示安全仪表盘</div>
+        </div>
+        <div id="dashContent" style="display:none">
+          <!-- Coverage ring -->
+          <div class="card" style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+              <div style="text-align:center">
+                <svg width="120" height="120" id="dashRing">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="10"/>
+                  <circle id="dashRingFill" cx="60" cy="60" r="50" fill="none" stroke="var(--success)" stroke-width="10" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                </svg>
+                <div style="font-size:28px;font-weight:800;margin-top:-75px;margin-bottom:40px" id="dashPct">0%</div>
+                <div style="font-size:13px;color:var(--muted)">脱敏覆盖率</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;margin-bottom:8px">安全状态</div>
+                <div id="dashStatus"></div>
+              </div>
+            </div>
+          </div>
+          <!-- PII breakdown bars -->
+          <div class="card" style="margin-bottom:12px">
+            <h4 style="font-size:13px;font-weight:700;margin-bottom:10px">📊 PII 类型覆盖对比</h4>
+            <div id="dashBars"></div>
+          </div>
+          <!-- Risk warnings -->
+          <div class="card">
+            <h4 style="font-size:13px;font-weight:700;margin-bottom:10px">⚠ 风险警告</h4>
+            <div id="dashWarnings"></div>
+            <button class="btn btn-sm" id="btnFixAll" style="margin-top:8px;background:var(--danger);color:#fff;display:none">🔧 一键修复所有风险</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ MODAL ═══════════ -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle"></div>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+  <!-- ═══════════ LOADING OVERLAY ═══════════ -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <div class="loading-title" id="loadingTitle">正在检测 PII…</div>
+      <div class="loading-progress" id="loadingProgress"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ WATERMARK OVERLAY ═══════════ -->
+  <div class="watermark-overlay" id="watermarkOverlay">
+    <div class="watermark-text">内部审核 · 严禁外传</div>
+    <div class="watermark-warn">⚠ 审核模式已开启 — 原始数据可见 — 30秒无操作自动关闭</div>
+  </div>
+</div>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<div class="footer">
+  DataVeil 数据面纱 · 数据不上传服务器，全部本地计算 · 仅供辅助参考
+</div>
+
+<!-- ═══════════ SHEETJS CDN ═══════════ -->
+<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DATA VEIL — JAVASCRIPT ENGINE
+   ═══════════════════════════════════════════════ */
+
+// ── GLOBAL STATE ──
+var STATE = {
+  raw: [],              // 原始数据
+  masked: [],           // 脱敏后数据
+  columns: [],          // 列名列表
+  columnRules: {},      // {列名: {type, mode, enabled, confidence}}
+  meta: {
+    rowCount: 0, maskedCells: 0,
+    perTypeCounts: {
+      idcard: {found:0,masked:0}, phone: {found:0,masked:0},
+      name:   {found:0,masked:0}, bankcard: {found:0,masked:0},
+      email:  {found:0,masked:0}, address: {found:0,masked:0},
+      plate:  {found:0,masked:0}
+    }
+  },
+  page: 1, pageSize: 50,
+  currentTab: 'preview',
+  auditMode: false, auditTimer: null,
+  settings: { theme: 'light', autoDetect: true, defaultMode: 'partial' }
+};
+
+// ── UTILITY FUNCTIONS ──
+function formatNum(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function esc(str) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+
+function toast(msg, type) {
+  var el = document.createElement('div');
+  el.className = 'toast' + (type === 'success' ? ' success' : type === 'warn' ? ' warn' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.style.animation = 'toastOut 0.3s ease forwards'; }, 1800);
+  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 2300);
+}
+
+// ── MODAL SYSTEM ──
+function openModal(title, bodyHTML) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+// ── FILE UPLOAD & PARSING ──
+function handleFiles(files) {
+  if (!files || !files.length) return;
+  var fileList = Array.from(files).filter(function(f) {
+    var n = f.name.toLowerCase();
+    return n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv');
+  });
+  if (!fileList.length) { toast('请选择 .xlsx / .xls / .csv 文件', 'warn'); return; }
+
+  STATE.raw = [];
+  var loaded = 0;
+  fileList.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var rows = parseExcelFile(e.target.result, file.name);
+      STATE.raw = STATE.raw.concat(rows);
+      loaded++;
+      if (loaded === fileList.length) finishUpload();
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  var uz = document.getElementById('uploadZone');
+  uz.classList.remove('idle');
+  uz.classList.add('has-data');
+  uz.querySelector('.upload-icon').textContent = '📊';
+  uz.querySelector('.upload-text').textContent = '正在解析文件...';
+  toast('正在解析文件...');
+}
+
+// ── CSV ENCODING DETECTION (P1-1) ──
+function detectAndDecodeCSV(arrayBuffer) {
+  // Check for UTF-8 BOM (EF BB BF)
+  var bytes = new Uint8Array(arrayBuffer);
+  var hasBOM = bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF;
+  var start = hasBOM ? 3 : 0;
+
+  // Try UTF-8 first
+  var utf8Text = new TextDecoder('utf-8', { fatal: false }).decode(
+    new Uint8Array(arrayBuffer, start)
+  );
+
+  // Check if UTF-8 result looks valid (has Chinese characters or common patterns)
+  if (/[一-龥]/.test(utf8Text) || /^[a-zA-Z0-9\s,._%+\-@]+$/.test(utf8Text.trim().split('\n')[0])) {
+    return utf8Text;
+  }
+
+  // Try GBK — common for Chinese CSV files
+  var gbkText = new TextDecoder('gbk', { fatal: false }).decode(
+    new Uint8Array(arrayBuffer, start)
+  );
+
+  // Use GBK if it has more Chinese characters
+  var utf8CN = (utf8Text.match(/[一-龥]/g) || []).length;
+  var gbkCN = (gbkText.match(/[一-龥]/g) || []).length;
+
+  if (gbkCN > utf8CN) {
+    console.log('CSV encoding: detected GBK (Chinese chars: ' + gbkCN + ' vs ' + utf8CN + ')');
+    return gbkText;
+  }
+
+  return utf8Text;
+}
+
+function parseExcelFile(data, fileName) {
+  var rows = [];
+  try {
+    var lower = fileName.toLowerCase();
+
+    // ── CSV: handle encoding detection (P1-1) ──
+    if (lower.endsWith('.csv')) {
+      var csvText = detectAndDecodeCSV(data);
+      var csvWb = XLSX.read(csvText, { type: 'string', raw: false });
+      var csvWs = csvWb.Sheets[csvWb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(csvWs, { defval: '' });
+      return rows;
+    }
+
+    // ── XLSX/XLS ──
+    var wb = XLSX.read(data, { type: 'array' });
+    for (var s = 0; s < wb.SheetNames.length; s++) {
+      var name = wb.SheetNames[s];
+      if (/^(说明|汇总|统计|目录|Sheet|sheet)/.test(name)) continue;
+      var sheet = wb.Sheets[name];
+      var json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if (!json.length) continue;
+      // Try to detect if first row is a header
+      var keys = Object.keys(json[0]);
+      var hasHeader = keys.some(function(k) {
+        return /[部门|姓名|手机|电话|身份证|地址|邮箱|日期|编号|名称|单位|备注|金额]/.test(k);
+      });
+      if (!hasHeader && json.length > 1) {
+        // Re-parse with header:1 to treat first row as header
+        var arr = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 });
+        if (arr.length > 1) {
+          var headers = arr[0].map(function(h) { return String(h || '').trim() || '列' + (h+1); });
+          json = [];
+          for (var i = 1; i < arr.length; i++) {
+            var row = {};
+            for (var j = 0; j < headers.length; j++) {
+              row[headers[j]] = arr[i][j] != null ? String(arr[i][j]).trim() : '';
+            }
+            json.push(row);
+          }
+        }
+      }
+      rows = rows.concat(json);
+    }
+  } catch(e) {
+    toast('解析文件出错: ' + e.message, 'warn');
+  }
+  return rows;
+}
+
+function finishUpload() {
+  if (!STATE.raw.length) {
+    toast('未能解析到数据，请检查文件格式', 'warn');
+    return;
+  }
+  STATE.columns = Object.keys(STATE.raw[0]).filter(function(k) { return k[0] !== '_'; });
+  STATE.meta.rowCount = STATE.raw.length;
+
+  // Show loading overlay for large files (P1-2)
+  showDataUI(); // Show tabs/stats bar early
+
+  if (STATE.raw.length > 2000) {
+    // Chunked processing for large files
+    showLoading('正在检测 PII…', '0 / ' + formatNum(STATE.columns.length) + ' 列');
+    processInChunks(0);
+  } else {
+    // Fast path for normal files
+    detectAllColumns();
+    autoConfigureRules();
+    applyMasking();
+    finalizeUpload();
+  }
+}
+
+function showLoading(title, progress) {
+  var overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('visible');
+  document.getElementById('loadingTitle').textContent = title;
+  document.getElementById('loadingProgress').textContent = progress || '';
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+function processInChunks(colIdx) {
+  if (colIdx >= STATE.columns.length) {
+    // All columns detected
+    autoConfigureRules();
+    applyMasking();
+    hideLoading();
+    finalizeUpload();
+    return;
+  }
+
+  // Process one column at a time with setTimeout for UI responsiveness
+  var col = STATE.columns[colIdx];
+  detectSingleColumn(col);
+  document.getElementById('loadingProgress').textContent =
+    (colIdx + 1) + ' / ' + formatNum(STATE.columns.length) + ' 列';
+
+  setTimeout(function() {
+    processInChunks(colIdx + 1);
+  }, 0);
+}
+
+// Extract single column detection from detectAllColumns
+function detectSingleColumn(col) {
+  var colLower = col.toLowerCase();
+  var headerMatch = null;
+
+  for (var type in PII_HEADERS) {
+    for (var k = 0; k < PII_HEADERS[type].length; k++) {
+      if (col.indexOf(PII_HEADERS[type][k]) !== -1) {
+        headerMatch = type;
+        break;
+      }
+    }
+    if (headerMatch) break;
+  }
+
+  var sampleSize = 200;
+  var sample = [];
+  for (var i = 0; i < Math.min(STATE.raw.length, sampleSize); i++) {
+    var v = STATE.raw[i][col];
+    if (v != null && v !== '') sample.push(v);
+  }
+
+  var bestType = null, bestConf = 0;
+
+  if (headerMatch && DETECTORS[headerMatch]) {
+    var r = DETECTORS[headerMatch](sample);
+    if (r.confidence > 0) {
+      bestType = headerMatch;
+      bestConf = Math.min(1, r.confidence + 0.1);
+    }
+  }
+
+  if (!bestType || bestConf < 0.5) {
+    for (var t in DETECTORS) {
+      if (t === headerMatch) continue;
+      var result = DETECTORS[t](sample);
+      if (result.confidence > bestConf) {
+        bestType = t;
+        bestConf = result.confidence;
+      }
+    }
+  }
+
+  STATE.columnRules[col] = {
+    type: bestType || 'none',
+    confidence: Math.round(bestConf * 100),
+    mode: 'partial',
+    enabled: bestConf > 0.5
+  };
+}
+
+function finalizeUpload() {
+  updateStatsUI();
+  renderTable();
+  renderRulesPanel();
+  renderStatsPanel();
+  renderDashboard();
+
+  var piiCount = Object.values(STATE.columnRules).filter(function(r) { return r.enabled; }).length;
+  document.getElementById('uploadZone').querySelector('.upload-text').textContent =
+    '已加载: ' + STATE.meta.rowCount + ' 行 · ' + STATE.columns.length + ' 列 · ' + piiCount + ' 类PII已检测';
+  addLog('上传文件: ' + formatNum(STATE.meta.rowCount) + '行, ' + piiCount + '类PII');
+  toast('✅ 成功解析 ' + formatNum(STATE.meta.rowCount) + ' 行数据，检测到 ' + piiCount + ' 类PII', 'success');
+}
+
+function showDataUI() {
+  document.getElementById('dataBadge').style.display = 'flex';
+  document.getElementById('dataBadge').textContent = '📊 ' + STATE.meta.rowCount + ' 行';
+  document.getElementById('layout').classList.add('visible');
+  document.getElementById('tabs').classList.add('visible');
+  document.getElementById('toolbar').classList.add('visible');
+  // Compact upload zone
+  document.getElementById('uploadZone').classList.add('compact');
+  switchTab(STATE.currentTab);
+}
+
+// ── PII DETECTION ENGINE ──
+
+// Column header keyword map
+var PII_HEADERS = {
+  idcard:   ['身份证','身份证号','ID','证件号码','公民身份号码','身份证号码'],
+  phone:    ['手机','电话','手机号','移动电话','联系电话','手机号码','联系方式'],
+  name:     ['姓名','名字','称呼','用户名','名称','联系人'],
+  bankcard: ['银行卡','卡号','银行账号','账号','储蓄卡','银行卡号'],
+  email:    ['邮箱','邮件','Email','E-mail','电子邮箱','邮件地址','电子邮件'],
+  address:  ['地址','住址','家庭住址','通讯地址','联系地址','所在地','详细地址'],
+  plate:    ['车牌','车牌号','号牌','车辆牌照','车牌号码']
+};
+
+// PII color dots for column headers
+var PII_DOTS = {
+  idcard: '#f59e0b', phone: '#3b82f6', name: '#22c55e',
+  bankcard: '#ec4899', email: '#6366f1', address: '#8b5cf6', plate: '#f97316'
+};
+
+var PII_LABELS = {
+  idcard: '🆔 身份证', phone: '📱 手机号', name: '👤 姓名',
+  bankcard: '💳 银行卡', email: '📧 邮箱', address: '🏠 地址', plate: '🚗 车牌'
+};
+
+// Validate Chinese ID card checksum
+function validateIDChecksum(id18) {
+  if (!/^\d{17}[\dXx]$/.test(id18)) return false;
+  var weights = [7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2];
+  var checkMap = ['1','0','X','9','8','7','6','5','4','3','2'];
+  var sum = 0;
+  for (var i = 0; i < 17; i++) sum += parseInt(id18[i]) * weights[i];
+  return checkMap[sum % 11] === id18[17].toUpperCase();
+}
+
+function detectIDCard(values) {
+  var count = 0, valid = 0;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim();
+    if (!/^\d{17}[\dXx]$/.test(v)) continue;
+    count++;
+    if (validateIDChecksum(v)) valid++;
+  }
+  if (!count) return { confidence: 0, count: 0 };
+  return { confidence: 0.4 + 0.3 * (valid / count) + 0.3 * (count / values.length), count: count };
+}
+
+function detectPhone(values) {
+  var count = 0;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim().replace(/^\+86/, '');
+    if (/^1[3-9]\d{9}$/.test(v)) count++;
+  }
+  var ratio = count / values.length;
+  return { confidence: ratio > 0.5 ? 0.5 + ratio * 0.4 : ratio * 0.8, count: count };
+}
+
+function detectName(values) {
+  var count = 0, unique = {};
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim();
+    if (/^[一-龥]{2,4}$/.test(v) && !/^[省市县区镇乡村路街号栋单元室]$/.test(v)) {
+      count++; unique[v] = 1;
+    }
+  }
+  var ratio = count / values.length;
+  var uniqRatio = Object.keys(unique).length / Math.max(count, 1);
+  return { confidence: ratio > 0.5 ? 0.4 + ratio * 0.4 + uniqRatio * 0.1 : ratio * 0.5, count: count };
+}
+
+// Luhn validation
+function validateLuhn(num) {
+  var sum = 0, alt = false;
+  for (var i = num.length - 1; i >= 0; i--) {
+    var d = parseInt(num[i]);
+    if (alt) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+function detectBankCard(values) {
+  var count = 0, valid = 0;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim().replace(/\s/g, '');
+    if (!/^\d{16,19}$/.test(v)) continue;
+    count++;
+    if (validateLuhn(v)) valid++;
+  }
+  if (!count) return { confidence: 0, count: 0 };
+  return { confidence: 0.3 + 0.4 * (valid / count) + 0.3 * (count / values.length), count: count };
+}
+
+function detectEmail(values) {
+  var count = 0;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim();
+    if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v)) count++;
+  }
+  var ratio = count / values.length;
+  return { confidence: ratio > 0.3 ? 0.8 * ratio : 0, count: count };
+}
+
+function detectAddress(values) {
+  var count = 0;
+  var provPattern = /[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤川青藏琼宁]|省|自治区/;
+  var roadPattern = /[路街大道号栋单元室小区村镇乡]/;
+  var cityPattern = /[市區县镇]/;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim();
+    if (v.length < 6) continue;
+    var score = 0;
+    if (provPattern.test(v)) score += 0.3;
+    if (roadPattern.test(v)) score += 0.2;
+    if (cityPattern.test(v)) score += 0.2;
+    if (v.length > 8) score += 0.1;
+    if (score > 0.4) count++;
+  }
+  var ratio = count / values.length;
+  return { confidence: ratio > 0.3 ? 0.5 + ratio * 0.3 : ratio * 0.6, count: count };
+}
+
+function detectPlate(values) {
+  var count = 0;
+  var re = /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤川青藏琼宁][A-Z][A-HJK-NP-Z0-9]{4,5}[A-HJK-NP-Z0-9挂学警港澳]$/;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i] || '').trim();
+    if (re.test(v)) count++;
+  }
+  var ratio = count / values.length;
+  return { confidence: ratio > 0.3 ? 0.8 * ratio : 0, count: count };
+}
+
+var DETECTORS = {
+  idcard: detectIDCard, phone: detectPhone, name: detectName,
+  bankcard: detectBankCard, email: detectEmail, address: detectAddress,
+  plate: detectPlate
+};
+
+function detectAllColumns() {
+  STATE.columnRules = {};
+  var cols = STATE.columns;
+
+  for (var c = 0; c < cols.length; c++) {
+    var col = cols[c];
+    var colLower = col.toLowerCase();
+    var headerMatch = null;
+
+    // Check header keywords first
+    for (var type in PII_HEADERS) {
+      for (var k = 0; k < PII_HEADERS[type].length; k++) {
+        if (col.indexOf(PII_HEADERS[type][k]) !== -1) {
+          headerMatch = type;
+          break;
+        }
+      }
+      if (headerMatch) break;
+    }
+
+    // Sample values
+    var sampleSize = 200;
+    var sample = [];
+    for (var i = 0; i < Math.min(STATE.raw.length, sampleSize); i++) {
+      var v = STATE.raw[i][col];
+      if (v != null && v !== '') sample.push(v);
+    }
+
+    var bestType = null, bestConf = 0;
+
+    if (headerMatch && DETECTORS[headerMatch]) {
+      var r = DETECTORS[headerMatch](sample);
+      if (r.confidence > 0) {
+        bestType = headerMatch;
+        bestConf = Math.min(1, r.confidence + 0.1); // header match boosts confidence
+      }
+    }
+
+    // If no header match or low confidence, check all detectors
+    if (!bestType || bestConf < 0.5) {
+      for (var t in DETECTORS) {
+        if (t === headerMatch) continue; // already checked
+        var result = DETECTORS[t](sample);
+        if (result.confidence > bestConf) {
+          bestType = t;
+          bestConf = result.confidence;
+        }
+      }
+    }
+
+    STATE.columnRules[col] = {
+      type: bestType || 'none',
+      confidence: Math.round(bestConf * 100),
+      mode: 'partial',
+      enabled: bestConf > 0.5
+    };
+  }
+}
+
+function autoConfigureRules() {
+  // Already done in detectAllColumns
+}
+
+// ── MASKING ENGINE ──
+var MASKERS = {
+  full: {
+    idcard:   function(v) { return '*'.repeat(18); },
+    phone:    function(v) { return '*'.repeat(11); },
+    name:     function(v) { return '*'.repeat(v.length); },
+    bankcard: function(v) { return '*'.repeat(String(v).replace(/\s/g,'').length); },
+    email:    function(v) { return '***@***.***'; },
+    address:  function(v) { return '*'.repeat(v.length); },
+    plate:    function(v) { return '*'.repeat(v.length); }
+  },
+  partial: {
+    idcard:   function(v) { v = String(v).trim(); return v.length >= 18 ? v.slice(0,6) + '********' + v.slice(-4) : '*'.repeat(v.length); },
+    phone:    function(v) { v = String(v).trim().replace(/^\+86/,''); return v.length >= 11 ? v.slice(0,3) + '****' + v.slice(-4) : '*'.repeat(v.length); },
+    name:     function(v) { var s = String(v).trim(); return s[0] + '*'.repeat(Math.max(1, s.length - 1)); },
+    bankcard: function(v) { var s = String(v).trim().replace(/\s/g,''); return s.length > 4 ? '**** **** **** ' + s.slice(-4) : '*'.repeat(s.length); },
+    email:    function(v) { var s = String(v).trim(); var at = s.indexOf('@'); return at > 0 ? s[0] + '***' + s.slice(at) : '***@***.***'; },
+    address:  function(v) { var s = String(v).trim(); return s.length > 6 ? s.slice(0, 6) + '*'.repeat(s.length - 6) : '*'.repeat(s.length); },
+    plate:    function(v) { var s = String(v).trim(); return s.length >= 2 ? s.slice(0, 2) + '*****' : '*'.repeat(s.length); }
+  }
+};
+
+function maskValue(value, type, mode) {
+  var v = String(value != null ? value : '').trim();
+  if (!v) return v;
+  if (!mode || mode === 'none') return v;
+  var masker = (MASKERS[mode] || {})[type];
+  if (masker) return masker(v);
+  // Fallback: partial by default
+  return mode === 'full' ? '*'.repeat(v.length) : v.slice(0, Math.ceil(v.length * 0.3)) + '*'.repeat(Math.floor(v.length * 0.7));
+}
+
+function applyMasking() {
+  var result = [];
+  var totalMasked = 0;
+  var perType = {
+    idcard: {found:0,masked:0}, phone:{found:0,masked:0}, name:{found:0,masked:0},
+    bankcard:{found:0,masked:0}, email:{found:0,masked:0}, address:{found:0,masked:0},
+    plate:{found:0,masked:0}
+  };
+
+  for (var i = 0; i < STATE.raw.length; i++) {
+    var row = STATE.raw[i];
+    var newRow = {};
+
+    for (var c = 0; c < STATE.columns.length; c++) {
+      var col = STATE.columns[c];
+      var val = row[col];
+      var rule = STATE.columnRules[col];
+
+      if (rule && rule.enabled && rule.type !== 'none' && rule.mode !== 'none') {
+        var masked = maskValue(val, rule.type, rule.mode);
+        newRow[col] = masked;
+        if (String(masked) !== String(val || '')) {
+          newRow['__m__' + c] = String(val || ''); // store original for tooltip
+          totalMasked++;
+          if (perType[rule.type]) perType[rule.type].masked++;
+        }
+      } else {
+        newRow[col] = val;
+      }
+
+      // Count found PII
+      if (rule && rule.type !== 'none' && rule.enabled) {
+        if (perType[rule.type] && val != null && val !== '') perType[rule.type].found++;
+      }
+    }
+    result.push(newRow);
+  }
+
+  STATE.masked = result;
+  STATE.meta.maskedCells = totalMasked;
+  STATE.meta.perTypeCounts = perType;
+}
+
+// ── RENDER: TABLE ──
+function renderTable() {
+  var tHead = document.getElementById('tableHead');
+  var tBody = document.getElementById('tableBody');
+  var tableWrapper = document.getElementById('tableWrapper');
+  var pagination = document.getElementById('pagination');
+  var empty = document.getElementById('previewEmpty');
+
+  if (!STATE.raw.length) {
+    tableWrapper.classList.remove('visible');
+    pagination.classList.remove('visible');
+    empty.style.display = 'flex';
+    return;
+  }
+
+  empty.style.display = 'none';
+  tableWrapper.classList.add('visible');
+
+  // Header — add audit mode warning tag
+  var auditTag = STATE.auditMode ? ' <span style="font-size:10px;background:var(--danger);color:#fff;padding:2px 8px;border-radius:10px;animation:pulse 1s infinite">⚠ 审核中</span>' : '';
+  var headHTML = '<tr>';
+  for (var c = 0; c < STATE.columns.length; c++) {
+    var col = STATE.columns[c];
+    var rule = STATE.columnRules[col];
+    var dot = '';
+    if (rule && rule.type !== 'none' && rule.enabled) {
+      dot = '<span class="pii-dot" style="background:' + (PII_DOTS[rule.type] || '#999') + '"></span>';
+    }
+    headHTML += '<th>' + dot + esc(col) + '</th>';
+  }
+  headHTML += '</tr>';
+  tHead.innerHTML = headHTML;
+
+  // Pagination
+  var sourceData = STATE.auditMode ? STATE.raw : STATE.masked;
+  var totalPages = Math.ceil(sourceData.length / STATE.pageSize);
+  if (STATE.page > totalPages) STATE.page = totalPages;
+  if (STATE.page < 1) STATE.page = 1;
+  var start = (STATE.page - 1) * STATE.pageSize;
+  var pageData = sourceData.slice(start, start + STATE.pageSize);
+
+  // Body — in audit mode show raw values; never expose title
+  var bodyHTML = '';
+  for (var r = 0; r < pageData.length; r++) {
+    var row = pageData[r];
+    var rawRow = STATE.raw[start + r]; // corresponding raw row
+    bodyHTML += '<tr>';
+    for (var c2 = 0; c2 < STATE.columns.length; c2++) {
+      var col2 = STATE.columns[c2];
+      var val = row[col2];
+      var orig = STATE.auditMode ? null : row['__m__' + c2];
+      var isMasked = orig !== undefined;
+      // In audit mode: show raw value, still highlight cells that WERE masked
+      var displayVal = STATE.auditMode ? (rawRow ? rawRow[col2] : val) : val;
+      var rule = STATE.columnRules[col2];
+      var wasMasked = rule && rule.enabled && rule.type !== 'none' && rule.mode !== 'none';
+      var cellClass = '';
+      if (STATE.auditMode && wasMasked) {
+        cellClass = 'masked-cell audit-reveal';
+      } else if (!STATE.auditMode && isMasked) {
+        cellClass = 'masked-cell';
+      }
+      bodyHTML += '<td class="' + cellClass + '">' +
+        esc(String(displayVal != null ? displayVal : '')) + '</td>';
+    }
+    bodyHTML += '</tr>';
+  }
+  tBody.innerHTML = bodyHTML;
+
+  // Pagination UI
+  pagination.classList.add('visible');
+  document.getElementById('pageInfo').textContent = '第 ' + STATE.page + '/' + totalPages + ' 页';
+  document.getElementById('btnPrev').disabled = STATE.page <= 1;
+  document.getElementById('btnNext').disabled = STATE.page >= totalPages;
+}
+
+// ── RENDER: RULES PANEL ──
+function renderRulesPanel() {
+  var rulesCard = document.getElementById('rulesCard');
+  var rulesBody = document.getElementById('rulesBody');
+  var rulesEmpty = document.getElementById('rulesEmpty');
+
+  if (!STATE.raw.length) {
+    rulesCard.style.display = 'none';
+    rulesEmpty.style.display = 'flex';
+    return;
+  }
+
+  rulesEmpty.style.display = 'none';
+  rulesCard.style.display = 'block';
+
+  var html = '';
+  for (var c = 0; c < STATE.columns.length; c++) {
+    var col = STATE.columns[c];
+    var rule = STATE.columnRules[col];
+    var conf = rule ? rule.confidence : 0;
+    var confColor = conf >= 80 ? '#22c55e' : conf >= 50 ? '#f59e0b' : '#94a3b8';
+
+    // Ring confidence SVG
+    var r = 11, circum = 2 * Math.PI * r, off = circum * (1 - conf / 100);
+    var ringHTML = '<svg width="26" height="26" style="vertical-align:middle;margin-right:4px"><circle cx="13" cy="13" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="2.5"/><circle cx="13" cy="13" r="' + r + '" fill="none" stroke="' + confColor + '" stroke-width="2.5" stroke-dasharray="' + circum + '" stroke-dashoffset="' + off + '" transform="rotate(-90 13 13)" stroke-linecap="round"/></svg>' + conf + '%';
+
+    var previewHTML = '—';
+    if (rule && rule.type !== 'none' && rule.enabled && STATE.masked.length) {
+      var maskedV = STATE.masked[0][col];
+      var rawV = STATE.raw[0][col];
+      if (maskedV !== rawV) {
+        previewHTML = esc(String(rawV || '').substring(0, 8) + (String(rawV||'').length > 8 ? '…' : '')) +
+          ' <span class="preview-tag">→ ' + esc(String(maskedV||'').substring(0, 6)) + '</span>';
+      } else {
+        previewHTML = esc(String(rawV || '').substring(0, 12));
+      }
+    } else if (STATE.raw.length) {
+      previewHTML = esc(String(STATE.raw[0][col] || '').substring(0, 12));
+    }
+
+    var typeOptions = '<option value="none">— 不检测</option>';
+    for (var t in PII_LABELS) {
+      typeOptions += '<option value="' + t + '"' + (rule && rule.type === t ? ' selected' : '') + '>' + PII_LABELS[t] + '</option>';
+    }
+
+    var mode = rule ? rule.mode : 'partial';
+    var modeHTML = '<span class="mode-group" data-cidx="' + c + '" data-key="mode">' +
+      '<button class="mode-btn' + (mode === 'partial' ? ' active' : '') + '" data-val="partial">部分</button>' +
+      '<button class="mode-btn' + (mode === 'full' ? ' active' : '') + '" data-val="full">完全</button>' +
+      '<button class="mode-btn' + (mode === 'none' ? ' active danger' : '') + '" data-val="none">关闭</button>' +
+      '</span>';
+
+    var checked = rule && rule.enabled ? ' checked' : '';
+
+    html += '<tr data-col="' + c + '">' +
+      '<td><strong>' + esc(col) + '</strong></td>' +
+      '<td><select data-cidx="' + c + '" data-key="type" style="width:130px">' + typeOptions + '</select></td>' +
+      '<td>' + ringHTML + '</td>' +
+      '<td>' + modeHTML + '</td>' +
+      '<td><span style="font-size:12px;color:var(--muted)">' + previewHTML + '</span></td>' +
+      '<td><label class="toggle-switch"><input type="checkbox"' + checked + ' data-cidx="' + c + '" data-key="enabled"><span class="toggle-slider"></span></label></td>' +
+      '</tr>';
+  }
+  rulesBody.innerHTML = html;
+
+  // Attach: type select
+  var selects = rulesBody.querySelectorAll('select[data-cidx]');
+  for (var i = 0; i < selects.length; i++) {
+    selects[i].addEventListener('change', function() {
+      var idx = parseInt(this.getAttribute('data-cidx'));
+      updateRule(STATE.columns[idx], this.getAttribute('data-key'), this.value);
+    });
+  }
+
+  // Attach: three-state mode buttons
+  var modeGroups = rulesBody.querySelectorAll('.mode-group');
+  for (var g = 0; g < modeGroups.length; g++) {
+    var btns = modeGroups[g].querySelectorAll('.mode-btn');
+    for (var b = 0; b < btns.length; b++) {
+      btns[b].addEventListener('click', function(e) {
+        e.stopPropagation();
+        var group = this.parentElement;
+        var idx = parseInt(group.getAttribute('data-cidx'));
+        var val = this.getAttribute('data-val');
+        group.querySelectorAll('.mode-btn').forEach(function(btn) { btn.classList.remove('active', 'danger'); });
+        this.classList.add('active');
+        if (val === 'none') this.classList.add('danger');
+        updateRule(STATE.columns[idx], 'mode', val);
+      });
+    }
+  }
+
+  // Attach: enabled toggle
+  var checkboxes = rulesBody.querySelectorAll('input[data-cidx]');
+  for (var j = 0; j < checkboxes.length; j++) {
+    checkboxes[j].addEventListener('change', function() {
+      var idx = parseInt(this.getAttribute('data-cidx'));
+      updateRule(STATE.columns[idx], 'enabled', this.checked);
+    });
+  }
+}
+
+function updateRule(col, key, value) {
+  if (!STATE.columnRules[col]) return;
+  // P0-2: Confirmation when disabling a PII column
+  if (key === 'enabled' && value === false && STATE.columnRules[col].type !== 'none') {
+    showDisableConfirm(col, key, value);
+    return;
+  }
+  applyRuleChange(col, key, value);
+}
+
+function showDisableConfirm(col, key, value) {
+  var typeName = (PII_LABELS[STATE.columnRules[col].type] || STATE.columnRules[col].type);
+  // Store pending for button handler (avoids inline onclick escaping issues)
+  STATE._pendingRule = { col: col, key: key, value: value };
+  var html = '<p>关闭脱敏后，<strong>' + esc(col) + '</strong> 列的全部 <strong>' + typeName + '</strong> 将显示为明文。</p>' +
+    '<p style="color:var(--danger);margin-top:8px">⚠ 确认继续？</p>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
+    '<button class="btn btn-sm" id="btnRuleCancel" style="background:var(--card);color:var(--text)">取消</button>' +
+    '<button class="btn btn-sm" id="btnRuleConfirm" style="background:var(--danger);color:#fff">确认关闭</button>' +
+    '</div>';
+  openModal('确认关闭脱敏', html);
+  // Attach listeners after modal is in DOM
+  setTimeout(function() {
+    var cancelBtn = document.getElementById('btnRuleCancel');
+    var confirmBtn = document.getElementById('btnRuleConfirm');
+    if (cancelBtn) cancelBtn.addEventListener('click', function() {
+      closeModal();
+      STATE._pendingRule = null;
+      // Reset the checkbox back to checked (undo the toggle)
+      renderRulesPanel();
+    });
+    if (confirmBtn) confirmBtn.addEventListener('click', function() {
+      closeModal();
+      if (STATE._pendingRule) {
+        applyRuleChange(STATE._pendingRule.col, STATE._pendingRule.key, STATE._pendingRule.value);
+        STATE._pendingRule = null;
+      }
+    });
+  }, 50);
+}
+
+function applyRuleChange(col, key, value) {
+  // If audit mode is on, disable it first
+  if (STATE.auditMode) disableAuditMode();
+  STATE.columnRules[col][key] = value;
+  if (key === 'enabled' && value === false) {
+    addLog('关闭脱敏: ' + col, 'danger');
+  } else if (key === 'enabled' && value === true) {
+    addLog('启用脱敏: ' + col);
+  }
+  applyMasking();
+  renderTable();
+  renderRulesPanel();
+  renderStatsPanel();
+  renderDashboard();
+  updateStatsUI();
+}
+
+// ── RENDER: STATS PANEL ──
+var TYPE_ICONS = {
+  idcard: '🆔', phone: '📱', name: '👤', bankcard: '💳',
+  email: '📧', address: '🏠', plate: '🚗'
+};
+var TYPE_COLORS = {
+  idcard: '#f59e0b', phone: '#3b82f6', name: '#22c55e',
+  bankcard: '#ec4899', email: '#6366f1', address: '#8b5cf6', plate: '#f97316'
+};
+var TYPE_NAMES = {
+  idcard: '身份证号码', phone: '手机号码', name: '姓名',
+  bankcard: '银行卡号', email: '电子邮箱', address: '家庭住址', plate: '车牌号'
+};
+
+function renderStatsPanel() {
+  var statsCard = document.getElementById('statsCard');
+  var statsContent = document.getElementById('statsContent');
+  var statsEmpty = document.getElementById('statsEmpty');
+
+  if (!STATE.raw.length) {
+    statsCard.style.display = 'none';
+    statsEmpty.style.display = 'flex';
+    return;
+  }
+
+  statsEmpty.style.display = 'none';
+  statsCard.style.display = 'block';
+
+  var counts = STATE.meta.perTypeCounts;
+  var totalFound = 0, totalMasked = 0;
+
+  var rowsHTML = '';
+  for (var t in TYPE_NAMES) {
+    var f = counts[t] ? counts[t].found : 0;
+    var m = counts[t] ? counts[t].masked : 0;
+    totalFound += f;
+    totalMasked += m;
+    var pct = f > 0 ? Math.round(m / f * 100) : 0;
+    rowsHTML += '<div class="stats-row">' +
+      '<span class="stats-row-icon">' + (TYPE_ICONS[t] || '📌') + '</span>' +
+      '<div class="stats-row-info"><div class="stats-row-name">' + TYPE_NAMES[t] + '</div><div class="stats-row-count">发现 ' + formatNum(f) + ' · 已脱敏 ' + formatNum(m) + '</div></div>' +
+      '<div class="stats-bar-wrap"><div class="stats-bar-fill" style="width:' + pct + '%;background:' + (TYPE_COLORS[t] || '#999') + '"></div></div>' +
+      '<div class="stats-row-pct">' + pct + '%</div>' +
+      '</div>';
+  }
+
+  var totalPct = totalFound > 0 ? Math.round(totalMasked / totalFound * 100) : 0;
+  var summaryHTML = '<div style="text-align:center;padding:16px;border-bottom:1px solid var(--border);margin-bottom:12px">' +
+    '<span style="font-size:28px;font-weight:700;color:var(--primary)">' + formatNum(totalMasked) + '</span>' +
+    '<span style="color:var(--muted)"> / ' + formatNum(totalFound) + ' PII 已脱敏</span>' +
+    '<div style="font-size:13px;color:var(--muted);margin-top:4px">覆盖率 <strong>' + totalPct + '%</strong> · ' +
+    formatNum(STATE.meta.rowCount) + ' 行数据处理完成</div></div>';
+
+  statsContent.innerHTML = summaryHTML + rowsHTML;
+}
+
+// ── UPDATE STATS ──
+function updateStatsUI() {
+  var piiCount = 0, typeCount = 0;
+  var enabledTypes = {};
+  for (var col in STATE.columnRules) {
+    var r = STATE.columnRules[col];
+    if (r && r.enabled && r.type !== 'none') {
+      piiCount++;
+      enabledTypes[r.type] = 1;
+    }
+  }
+  for (var t in enabledTypes) typeCount++;
+
+  document.getElementById('statRows').textContent = formatNum(STATE.meta.rowCount);
+  document.getElementById('statPII').textContent = formatNum(STATE.meta.maskedCells);
+  document.getElementById('statCols').textContent = STATE.columns.length;
+  document.getElementById('statTypes').textContent = typeCount;
+}
+
+// ── RENDER: DASHBOARD ──
+function renderDashboard() {
+  var dashEmpty = document.getElementById('dashEmpty');
+  var dashContent = document.getElementById('dashContent');
+
+  if (!STATE.raw.length) {
+    dashEmpty.style.display = 'flex';
+    dashContent.style.display = 'none';
+    return;
+  }
+
+  dashEmpty.style.display = 'none';
+  dashContent.style.display = 'block';
+
+  var counts = STATE.meta.perTypeCounts;
+  var totalFound = 0, totalMasked = 0;
+  for (var t in counts) { totalFound += counts[t].found; totalMasked += counts[t].masked; }
+  var coverage = totalFound > 0 ? Math.round(totalMasked / totalFound * 100) : 0;
+
+  // Coverage ring
+  var circumference = 2 * Math.PI * 50;
+  var fill = document.getElementById('dashRingFill');
+  fill.setAttribute('stroke-dasharray', circumference);
+  fill.setAttribute('stroke-dashoffset', circumference * (1 - coverage / 100));
+  fill.setAttribute('stroke', coverage >= 90 ? 'var(--success)' : coverage >= 70 ? 'var(--warning)' : 'var(--danger)');
+  document.getElementById('dashPct').textContent = coverage + '%';
+  document.getElementById('dashPct').style.color = coverage >= 90 ? 'var(--success)' : coverage >= 70 ? 'var(--warning)' : 'var(--danger)';
+
+  // Status
+  var statusHTML = '';
+  var riskList = [];
+  for (var c = 0; c < STATE.columns.length; c++) {
+    var col = STATE.columns[c];
+    var rule = STATE.columnRules[col];
+    if (rule && rule.type !== 'none' && !rule.enabled) {
+      riskList.push({col: col, type: rule.type});
+    }
+  }
+
+  if (coverage >= 100) {
+    statusHTML = '<div style="color:var(--success);font-weight:600">✅ 安全 — 所有PII已完全脱敏</div>';
+  } else if (riskList.length === 0) {
+    statusHTML = '<div style="color:var(--success);font-weight:600">✅ 正常 — 无高风险列</div>';
+  } else {
+    statusHTML = '<div style="color:var(--danger);font-weight:600">⚠ 注意 — ' + riskList.length + ' 个PII列未脱敏</div>';
+    for (var r = 0; r < riskList.length; r++) {
+      statusHTML += '<div style="font-size:12px;color:var(--danger);margin-top:2px">• ' + esc(riskList[r].col) + ' (' + (PII_LABELS[riskList[r].type] || riskList[r].type) + ')</div>';
+    }
+  }
+  document.getElementById('dashStatus').innerHTML = statusHTML;
+
+  // PII type bars
+  var barsHTML = '';
+  for (var t2 in TYPE_NAMES) {
+    var f = counts[t2] ? counts[t2].found : 0;
+    var m = counts[t2] ? counts[t2].masked : 0;
+    var pct = f > 0 ? Math.round(m / f * 100) : 0;
+    var color = TYPE_COLORS[t2] || '#999';
+    barsHTML += '<div style="display:flex;align-items:center;gap:8px;margin:6px 0">' +
+      '<span style="width:80px;font-size:12px">' + (TYPE_ICONS[t2]||'') + ' ' + TYPE_NAMES[t2] + '</span>' +
+      '<span style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">' +
+      '<span style="display:block;height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px;transition:width 0.5s ease"></span></span>' +
+      '<span style="width:40px;font-size:11px;font-weight:600;text-align:right">' + pct + '%</span>' +
+      '</div>';
+  }
+  document.getElementById('dashBars').innerHTML = barsHTML;
+
+  // Risk warnings
+  var warnHTML = '';
+  var fixBtn = document.getElementById('btnFixAll');
+  if (riskList.length > 0) {
+    for (var w = 0; w < riskList.length; w++) {
+      warnHTML += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--masked-bg);border-radius:8px;margin:4px 0">' +
+        '<span style="font-size:12px">⚠ <strong>' + esc(riskList[w].col) + '</strong> — ' + (PII_LABELS[riskList[w].type] || riskList[w].type) + ' 脱敏已关闭</span>' +
+        '<button class="btn btn-sm" onclick="applyRuleChange(\'' + esc(riskList[w].col).replace(/'/g,"\\'") + '\',\'enabled\',true)" style="background:var(--success);color:#fff">启用</button>' +
+        '</div>';
+    }
+    fixBtn.style.display = 'inline-block';
+  } else {
+    warnHTML = '<div style="font-size:13px;color:var(--success)">✅ 所有PII列均已启用脱敏</div>';
+    fixBtn.style.display = 'none';
+  }
+  document.getElementById('dashWarnings').innerHTML = warnHTML;
+}
+
+// ── DOWNLOAD ──
+function downloadMasked() {
+  // If audit mode is on, disable it first
+  if (STATE.auditMode) disableAuditMode();
+
+  if (!STATE.masked.length) { toast('没有数据可下载', 'warn'); return; }
+
+  // P0-2: Export validation — scan for disabled PII columns
+  var riskCols = [];
+  for (var i = 0; i < STATE.columns.length; i++) {
+    var col = STATE.columns[i];
+    var rule = STATE.columnRules[col];
+    if (rule && rule.type !== 'none' && !rule.enabled) {
+      riskCols.push({ name: col, type: rule.type, label: PII_LABELS[rule.type] || rule.type });
+    }
+  }
+
+  if (riskCols.length > 0) {
+    showExportWarning(riskCols);
+    return;
+  }
+
+  doExport();
+}
+
+function showExportWarning(riskCols) {
+  var listHTML = '';
+  for (var r = 0; r < riskCols.length; r++) {
+    listHTML += '<li style="margin:4px 0">' + riskCols[r].label + ' — <strong>' + esc(riskCols[r].name) + '</strong></li>';
+  }
+
+  var html = '<div style="margin-bottom:12px">' +
+    '<p style="color:var(--danger);font-weight:600;margin-bottom:8px">⚠ 以下 PII 列的脱敏已关闭，导出文件将包含明文敏感信息：</p>' +
+    '<ul style="padding-left:20px">' + listHTML + '</ul>' +
+    '</div>' +
+    '<div class="confirm-check">' +
+    '<input type="checkbox" id="chkRiskAck" onchange="document.getElementById(\'btnExportProceed\').disabled=!this.checked">' +
+    '<label for="chkRiskAck">我已知晓风险，确认导出包含明文 PII 的文件</label>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
+    '<button class="btn btn-sm" onclick="closeModal()">取消</button>' +
+    '<button class="btn btn-sm" id="btnExportProceed" disabled onclick="closeModal();doExport()" style="background:var(--danger);color:#fff">⚠ 风险确认，继续导出</button>' +
+    '</div>';
+
+  openModal('导出安全警告', html);
+}
+
+function doExport() {
+  // Build clean export data (remove __m__ metadata)
+  var exportData = [];
+  for (var i = 0; i < STATE.masked.length; i++) {
+    var row = {};
+    for (var c = 0; c < STATE.columns.length; c++) {
+      row[STATE.columns[c]] = STATE.masked[i][STATE.columns[c]];
+    }
+    exportData.push(row);
+  }
+
+  var ws = XLSX.utils.json_to_sheet(exportData);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '脱敏数据');
+
+  var now = new Date();
+  var dateStr = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0');
+  var filename = '脱敏_数据_' + dateStr + '.xlsx';
+
+  XLSX.writeFile(wb, filename);
+  addLog('导出文件: ' + filename);
+  toast('📥 已下载脱敏文件: ' + filename, 'success');
+}
+
+// ── TAB SWITCHING ──
+function switchTab(name) {
+  STATE.currentTab = name;
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === name);
+  });
+  document.getElementById('tab-preview').style.display = name === 'preview' ? 'block' : 'none';
+  document.getElementById('tab-rules').style.display = name === 'rules' ? 'block' : 'none';
+  document.getElementById('tab-stats').style.display = name === 'stats' ? 'block' : 'none';
+
+  document.getElementById('tab-rules').classList.toggle('visible', name === 'rules');
+  document.getElementById('tab-stats').classList.toggle('visible', name === 'stats');
+  document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? 'block' : 'none';
+
+  if (name === 'rules') renderRulesPanel();
+  if (name === 'stats') renderStatsPanel();
+  if (name === 'dashboard') renderDashboard();
+}
+
+// ── AUDIT MODE ──
+function toggleAuditMode() {
+  if (STATE.auditMode) {
+    disableAuditMode();
+  } else {
+    enableAuditMode();
+  }
+}
+
+function enableAuditMode() {
+  STATE.auditMode = true;
+  showWatermark();
+  renderTable();
+  var btn = document.getElementById('btnAudit');
+  btn.textContent = '👁 退出审核';
+  btn.classList.add('active');
+  document.getElementById('dataBadge').textContent = '⚠ 审核中';
+  document.getElementById('dataBadge').style.background = 'rgba(239,68,68,0.12)';
+  addLog('审核模式开启', 'warn');
+  toast('⚠ 审核模式已开启 — 原始数据可见 — 30秒无操作自动关闭', 'warn');
+  resetAuditTimer();
+  // Listen for user activity
+  ['click','keydown','mousemove','scroll'].forEach(function(ev) {
+    document.addEventListener(ev, resetAuditTimer, { once: false });
+  });
+}
+
+function disableAuditMode() {
+  STATE.auditMode = false;
+  hideWatermark();
+  clearAuditTimer();
+  renderTable();
+  var btn = document.getElementById('btnAudit');
+  btn.textContent = '👁 审核模式';
+  btn.classList.remove('active');
+  updateStatsUI();
+  addLog('审核模式关闭');
+  toast('🔒 审核模式已关闭 — 数据已恢复脱敏状态');
+  ['click','keydown','mousemove','scroll'].forEach(function(ev) {
+    document.removeEventListener(ev, resetAuditTimer);
+  });
+}
+
+function resetAuditTimer() {
+  clearAuditTimer();
+  STATE.auditTimer = setTimeout(function() {
+    if (STATE.auditMode) {
+      toast('⏰ 30秒无操作，自动关闭审核模式', 'warn');
+      disableAuditMode();
+    }
+  }, 30000);
+}
+
+function clearAuditTimer() {
+  if (STATE.auditTimer) { clearTimeout(STATE.auditTimer); STATE.auditTimer = null; }
+}
+
+function showWatermark() {
+  document.getElementById('watermarkOverlay').classList.add('visible');
+}
+
+function hideWatermark() {
+  document.getElementById('watermarkOverlay').classList.remove('visible');
+}
+
+// ── THEME ──
+function toggleTheme() {
+  var current = document.documentElement.getAttribute('data-theme');
+  var next = current === 'dark' ? '' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+  STATE.settings.theme = next || 'light';
+  saveSettings();
+}
+
+// ── PRESET BUTTONS ──
+function presetAll() {
+  if (STATE.auditMode) disableAuditMode();
+  for (var col in STATE.columnRules) {
+    var r = STATE.columnRules[col];
+    if (r && r.type !== 'none') {
+      r.enabled = true;
+      r.mode = 'partial';
+    }
+  }
+  applyMasking();
+  renderTable();
+  renderRulesPanel();
+  renderStatsPanel();
+  updateStatsUI();
+  toast('🔒 已启用全部PII脱敏');
+}
+
+function presetIDPhone() {
+  if (STATE.auditMode) disableAuditMode();
+  for (var col in STATE.columnRules) {
+    var r = STATE.columnRules[col];
+    if (r) {
+      if (r.type === 'idcard' || r.type === 'phone') {
+        r.enabled = true;
+        r.mode = 'partial';
+      } else {
+        r.enabled = false;
+      }
+    }
+  }
+  applyMasking();
+  renderTable();
+  renderRulesPanel();
+  renderStatsPanel();
+  updateStatsUI();
+  toast('🆔📱 仅脱敏身份证+手机号');
+}
+
+function presetReset() {
+  if (STATE.auditMode) disableAuditMode();
+  detectAllColumns();
+  autoConfigureRules();
+  applyMasking();
+  renderTable();
+  renderRulesPanel();
+  renderStatsPanel();
+  updateStatsUI();
+  toast('🔄 已重置为自动检测配置');
+}
+
+// ── OPERATION LOG (P3) ──
+var LOG_MAX = 30;
+function addLog(msg, type) {
+  var list = document.getElementById('logList');
+  if (!list) return;
+  // Remove placeholder on first log
+  if (list.children.length === 1 && list.children[0].textContent === '等待操作…') {
+    list.innerHTML = '';
+  }
+  var now = new Date();
+  var time = String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0');
+  var color = type === 'warn' ? 'var(--warning)' : type === 'danger' ? 'var(--danger)' : 'var(--muted)';
+  var icon = type === 'warn' ? '⚠' : type === 'danger' ? '🔴' : 'ℹ';
+  var entry = document.createElement('div');
+  entry.style.cssText = 'padding:3px 0;border-bottom:1px solid var(--border);line-height:1.4;color:' + color;
+  entry.innerHTML = '<span style="opacity:0.6">' + time + '</span> ' + icon + ' ' + msg;
+  list.insertBefore(entry, list.firstChild);
+  // Trim overflow
+  while (list.children.length > LOG_MAX) list.removeChild(list.lastChild);
+}
+
+// ── PERSISTENCE ──
+function loadSettings() {
+  try {
+    var s = localStorage.getItem('dataveil_settings');
+    return s ? JSON.parse(s) : {};
+  } catch(e) { return {}; }
+}
+function saveSettings() {
+  try { localStorage.setItem('dataveil_settings', JSON.stringify(STATE.settings)); } catch(e) {}
+}
+
+// ── INIT ──
+function init() {
+  var saved = loadSettings();
+  if (saved.theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+  STATE.settings = Object.assign(STATE.settings, saved);
+
+  // Theme toggle
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+  // Upload zone
+  var uz = document.getElementById('uploadZone');
+  var fi = document.getElementById('fileInput');
+  uz.addEventListener('click', function() { fi.click(); });
+  fi.addEventListener('change', function() { handleFiles(this.files); });
+  uz.addEventListener('dragover', function(e) { e.preventDefault(); uz.classList.add('dragover'); uz.classList.remove('idle'); });
+  uz.addEventListener('dragleave', function() { uz.classList.remove('dragover'); });
+  uz.addEventListener('drop', function(e) { e.preventDefault(); uz.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { switchTab(this.getAttribute('data-tab')); });
+  });
+
+  // Audit mode
+  document.getElementById('btnAudit').addEventListener('click', toggleAuditMode);
+
+  // Preset buttons
+  document.getElementById('presetAll').addEventListener('click', presetAll);
+  document.getElementById('presetIDPhone').addEventListener('click', presetIDPhone);
+  document.getElementById('presetReset').addEventListener('click', presetReset);
+  document.getElementById('btnDownload').addEventListener('click', downloadMasked);
+
+  // Fix all risks button (dashboard)
+  var fixBtn = document.getElementById('btnFixAll');
+  if (fixBtn) fixBtn.addEventListener('click', function() {
+    for (var col in STATE.columnRules) {
+      var rule = STATE.columnRules[col];
+      if (rule && rule.type !== 'none' && !rule.enabled) {
+        rule.enabled = true;
+      }
+    }
+    if (STATE.auditMode) disableAuditMode();
+    applyMasking();
+    renderTable();
+    renderRulesPanel();
+    renderStatsPanel();
+    renderDashboard();
+    updateStatsUI();
+    toast('🔧 所有PII列已启用脱敏');
+  });
+
+  // Pagination
+  document.getElementById('btnPrev').addEventListener('click', function() { if (STATE.page > 1) { STATE.page--; renderTable(); } });
+  document.getElementById('btnNext').addEventListener('click', function() {
+    var sourceLen = STATE.auditMode ? STATE.raw.length : STATE.masked.length;
+    var tp = Math.ceil(sourceLen / STATE.pageSize);
+    if (STATE.page < tp) { STATE.page++; renderTable(); }
+  });
+
+  // Modal
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalOverlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (STATE.auditMode) { disableAuditMode(); return; }
+      closeModal();
+    }
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); downloadMasked(); }
+  });
+}
+
+// ── START ──
+init();
+</script>
+</body>
+</html>
