@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DataVeil 数据面纱 — 隐私优先的PII数据脱敏工具</title>
+<link rel="dns-prefetch" href="https://cdn.bootcdn.net">
+<link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
 <style>
 /* ═══════════════════════════════════════════════
    DATA VEIL — DESIGN SYSTEM
@@ -515,6 +517,18 @@ tbody tr:hover { background: var(--accent-light); }
 </style>
 </head>
 <body>
+<!-- Loading skeleton -->
+<div id="appLoader" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#f8fafc);display:flex;align-items:center;justify-content:center;transition:opacity 0.3s">
+<div style="text-align:center">
+<div style="font-size:48px;margin-bottom:12px">🛡️</div>
+<div style="font-size:18px;font-weight:700;margin-bottom:4px">DataVeil</div>
+<div style="font-size:13px;color:#888">组件加载中…</div>
+<div style="width:100px;height:3px;background:#e2e8f0;border-radius:2px;margin:12px auto 0;overflow:hidden">
+<div id="loaderBar" style="height:100%;width:0%;background:#3b82f6;border-radius:2px;transition:width 0.3s"></div>
+</div>
+</div>
+</div>
+
 <div class="container">
   <!-- ═══════════ HEADER ═══════════ -->
   <div class="header">
@@ -756,21 +770,49 @@ function closeModal() { document.getElementById('modalOverlay').classList.remove
 // ── FILE UPLOAD & PARSING ──
 function handleFiles(files) {
   if (!files || !files.length) return;
-  var fileList = Array.from(files).filter(function(f) {
-    var n = f.name.toLowerCase();
-    return n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv');
+
+  var MAX_SIZE = 30 * 1024 * 1024; // 30MB
+  var ALLOWED = ['.xlsx', '.xls', '.csv'];
+  var rejected = [];
+  var oversized = [];
+  var validFiles = [];
+
+  Array.from(files).forEach(function(f) {
+    var ext = f.name.toLowerCase().slice(f.name.lastIndexOf('.'));
+    if (ALLOWED.indexOf(ext) === -1) { rejected.push(f.name); return; }
+    if (f.size > MAX_SIZE) { oversized.push(f.name); return; }
+    validFiles.push(f);
   });
-  if (!fileList.length) { toast('请选择 .xlsx / .xls / .csv 文件', 'warn'); return; }
+
+  if (rejected.length) toast('⚠ 不支持的文件格式: ' + rejected.join(', '), 'warn');
+  if (oversized.length) toast('⚠ 文件过大(>30MB)，建议拆分后上传: ' + oversized.join(', '), 'warn');
+  if (!validFiles.length) {
+    if (!rejected.length && !oversized.length) return;
+    toast('没有可处理的文件，请选择 .xlsx / .xls / .csv', 'warn');
+    return;
+  }
 
   STATE.raw = [];
   var loaded = 0;
-  fileList.forEach(function(file) {
+  validFiles.forEach(function(file) {
     var reader = new FileReader();
+    reader.onerror = function() { toast('⚠ 文件读取失败: ' + file.name, 'warn'); };
     reader.onload = function(e) {
-      var rows = parseExcelFile(e.target.result, file.name);
-      STATE.raw = STATE.raw.concat(rows);
+      try {
+        var rows = parseExcelFile(e.target.result, file.name);
+        STATE.raw = STATE.raw.concat(rows);
+      } catch(err) {
+        console.error('Parse error:', err);
+        toast('⚠ 解析失败: ' + file.name, 'warn');
+      }
       loaded++;
-      if (loaded === fileList.length) finishUpload();
+      if (loaded === validFiles.length) {
+        if (!STATE.raw.length) {
+          toast('⚠ 未能解析到有效数据，请检查文件内容', 'warn');
+          return;
+        }
+        finishUpload();
+      }
     };
     reader.readAsArrayBuffer(file);
   });
@@ -1001,7 +1043,34 @@ function showDataUI() {
 
 // ── PII DETECTION ENGINE ──
 
-// Column header keyword map
+// ── PII REGISTRY (extensible architecture) ──
+var PII_REGISTRY = {};
+
+function registerPIIType(config) {
+  if (!config.type) { console.error('registerPIIType: type required'); return; }
+  PII_REGISTRY[config.type] = {
+    type: config.type,
+    headers: config.headers || [],
+    detector: config.detector || function() { return {confidence:0, count:0}; },
+    maskers: config.maskers || { partial: function(v){ return '*'.repeat(String(v||'').length); }, full: function(v){ return '*'.repeat(String(v||'').length); } },
+    icon: config.icon || '📌',
+    label: config.label || config.type,
+    color: config.color || '#999'
+  };
+  // Sync to legacy lookup objects
+  PII_HEADERS[config.type] = config.headers || [];
+  DETECTORS[config.type] = PII_REGISTRY[config.type].detector;
+  PII_LABELS[config.type] = config.icon + ' ' + config.label;
+  PII_DOTS[config.type] = config.color;
+  TYPE_ICONS[config.type] = config.icon;
+  TYPE_COLORS[config.type] = config.color;
+  TYPE_NAMES[config.type] = config.label;
+  // Sync maskers
+  MASKERS.partial[config.type] = PII_REGISTRY[config.type].maskers.partial;
+  MASKERS.full[config.type] = PII_REGISTRY[config.type].maskers.full;
+}
+
+// Column header keyword map (populated by registerPIIType)
 var PII_HEADERS = {
   idcard:   ['身份证','身份证号','ID','证件号码','公民身份号码','身份证号码'],
   phone:    ['手机','电话','手机号','移动电话','联系电话','手机号码','联系方式'],
@@ -1018,10 +1087,10 @@ var PII_DOTS = {
   bankcard: '#ec4899', email: '#6366f1', address: '#8b5cf6', plate: '#f97316'
 };
 
-var PII_LABELS = {
-  idcard: '🆔 身份证', phone: '📱 手机号', name: '👤 姓名',
-  bankcard: '💳 银行卡', email: '📧 邮箱', address: '🏠 地址', plate: '🚗 车牌'
-};
+var PII_LABELS = {};
+var TYPE_ICONS = {};
+var TYPE_COLORS = {};
+var TYPE_NAMES = {};
 
 // Validate Chinese ID card checksum
 function validateIDChecksum(id18) {
@@ -1232,6 +1301,73 @@ function maskValue(value, type, mode) {
   // Fallback: partial by default
   return mode === 'full' ? '*'.repeat(v.length) : v.slice(0, Math.ceil(v.length * 0.3)) + '*'.repeat(Math.floor(v.length * 0.7));
 }
+
+// ── Register built-in PII types ──
+(function initPIIRegistry() {
+  registerPIIType({
+    type: 'idcard', icon: '🆔', label: '身份证号码', color: '#f59e0b',
+    headers: ['身份证','身份证号','ID','证件号码','公民身份号码','身份证号码'],
+    detector: detectIDCard,
+    maskers: {
+      partial: function(v) { v = String(v).trim(); return v.length >= 18 ? v.slice(0,6) + '********' + v.slice(-4) : '*'.repeat(v.length); },
+      full:    function(v) { return '*'.repeat(18); }
+    }
+  });
+  registerPIIType({
+    type: 'phone', icon: '📱', label: '手机号码', color: '#3b82f6',
+    headers: ['手机','电话','手机号','移动电话','联系电话','手机号码','联系方式'],
+    detector: detectPhone,
+    maskers: {
+      partial: function(v) { v = String(v).trim().replace(/^\+86/,''); return v.length >= 11 ? v.slice(0,3) + '****' + v.slice(-4) : '*'.repeat(v.length); },
+      full:    function(v) { return '*'.repeat(11); }
+    }
+  });
+  registerPIIType({
+    type: 'name', icon: '👤', label: '姓名', color: '#22c55e',
+    headers: ['姓名','名字','称呼','用户名','名称','联系人'],
+    detector: detectName,
+    maskers: {
+      partial: function(v) { var s = String(v).trim(); return s[0] + '*'.repeat(Math.max(1, s.length - 1)); },
+      full:    function(v) { return '*'.repeat(v.length); }
+    }
+  });
+  registerPIIType({
+    type: 'bankcard', icon: '💳', label: '银行卡号', color: '#ec4899',
+    headers: ['银行卡','卡号','银行账号','账号','储蓄卡','银行卡号'],
+    detector: detectBankCard,
+    maskers: {
+      partial: function(v) { var s = String(v).trim().replace(/\s/g,''); return s.length > 4 ? '**** **** **** ' + s.slice(-4) : '*'.repeat(s.length); },
+      full:    function(v) { return '*'.repeat(String(v).replace(/\s/g,'').length); }
+    }
+  });
+  registerPIIType({
+    type: 'email', icon: '📧', label: '电子邮箱', color: '#6366f1',
+    headers: ['邮箱','邮件','Email','E-mail','电子邮箱','邮件地址','电子邮件'],
+    detector: detectEmail,
+    maskers: {
+      partial: function(v) { var s = String(v).trim(); var at = s.indexOf('@'); return at > 0 ? s[0] + '***' + s.slice(at) : '***@***.***'; },
+      full:    function(v) { return '***@***.***'; }
+    }
+  });
+  registerPIIType({
+    type: 'address', icon: '🏠', label: '家庭住址', color: '#8b5cf6',
+    headers: ['地址','住址','家庭住址','通讯地址','联系地址','所在地','详细地址'],
+    detector: detectAddress,
+    maskers: {
+      partial: function(v) { var s = String(v).trim(); return s.length > 6 ? s.slice(0, 6) + '*'.repeat(s.length - 6) : '*'.repeat(s.length); },
+      full:    function(v) { return '*'.repeat(v.length); }
+    }
+  });
+  registerPIIType({
+    type: 'plate', icon: '🚗', label: '车牌号', color: '#f97316',
+    headers: ['车牌','车牌号','号牌','车辆牌照','车牌号码'],
+    detector: detectPlate,
+    maskers: {
+      partial: function(v) { var s = String(v).trim(); return s.length >= 2 ? s.slice(0, 2) + '*****' : '*'.repeat(s.length); },
+      full:    function(v) { return '*'.repeat(v.length); }
+    }
+  });
+})();
 
 function applyMasking() {
   var result = [];
@@ -1513,18 +1649,7 @@ function applyRuleChange(col, key, value) {
 }
 
 // ── RENDER: STATS PANEL ──
-var TYPE_ICONS = {
-  idcard: '🆔', phone: '📱', name: '👤', bankcard: '💳',
-  email: '📧', address: '🏠', plate: '🚗'
-};
-var TYPE_COLORS = {
-  idcard: '#f59e0b', phone: '#3b82f6', name: '#22c55e',
-  bankcard: '#ec4899', email: '#6366f1', address: '#8b5cf6', plate: '#f97316'
-};
-var TYPE_NAMES = {
-  idcard: '身份证号码', phone: '手机号码', name: '姓名',
-  bankcard: '银行卡号', email: '电子邮箱', address: '家庭住址', plate: '车牌号'
-};
+// (TYPE_ICONS/TYPE_COLORS/TYPE_NAMES populated by registerPIIType)
 
 function renderStatsPanel() {
   var statsCard = document.getElementById('statsCard');
@@ -1926,6 +2051,23 @@ function saveSettings() {
 
 // ── INIT ──
 function init() {
+  // Hide loading skeleton
+  (function(){
+    var loader=document.getElementById("appLoader");
+    if(loader){loader.style.opacity="0";setTimeout(function(){if(loader.parentNode)loader.parentNode.removeChild(loader);},300);}
+  })();
+
+  // CDN fallback check
+  if (typeof XLSX === 'undefined') {
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;text-align:center"><div><h1>⚠️ 库加载失败</h1><p>SheetJS 未能加载，请检查网络连接后刷新页面。</p><p style="color:#888;font-size:13px">如果 CDN 不可用，可以下载 SheetJS 放在同目录下本地引用。</p></div></div>';
+    return;
+  }
+
+  // Embedded test mode: ?test=1
+  if (window.location.search.indexOf('test=1') !== -1) {
+    setTimeout(runTests, 100);
+  }
+
   var saved = loadSettings();
   if (saved.theme === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -2001,6 +2143,100 @@ function init() {
     if (e.key === 'Escape') closeModal();
     if (e.ctrlKey && e.key === 's') { e.preventDefault(); downloadMasked(); }
   });
+}
+
+// ── EMBEDDED TESTS (?test=1) ──
+function runTests() {
+  var results = [];
+  function t(name, fn) {
+    try {
+      var pass = fn();
+      results.push({ name: name, pass: !!pass });
+    } catch(e) {
+      results.push({ name: name, pass: false, error: e.message });
+    }
+  }
+
+  // PII detection tests
+  t('validateIDChecksum valid', function() { return validateIDChecksum('110101199003071234') === true; });
+  t('validateIDChecksum invalid', function() { return validateIDChecksum('110101199003071235') === false; });
+  t('validateIDChecksum X suffix', function() { return validateIDChecksum('11010119900307123X') === true; });
+  t('validateLuhn valid card', function() { return validateLuhn('6222021234567890') === true; });
+  t('validateLuhn invalid card', function() { return validateLuhn('1234567890123456') === false; });
+  t('detectPhone valid', function() {
+    var r = detectPhone(['13812345678', '15987654321', 'notaphone']);
+    return r.confidence > 0.5 && r.count === 2;
+  });
+  t('detectPhone empty', function() {
+    var r = detectPhone(['abc', 'def']);
+    return r.confidence === 0;
+  });
+  t('detectName valid', function() {
+    var r = detectName(['张三', '李四五六', 'ab', 'test']);
+    return r.count >= 2 && r.confidence > 0;
+  });
+  t('detectEmail valid', function() {
+    var r = detectEmail(['test@example.com', 'foo@bar.cn', 'notanemail']);
+    return r.count >= 2;
+  });
+  t('detectAddress valid', function() {
+    var r = detectAddress(['北京市海淀区中关村大街1号', '上海市浦东新区陆家嘴']);
+    return r.count >= 1 && r.confidence > 0;
+  });
+
+  // Masking tests
+  t('maskValue partial phone', function() {
+    return maskValue('13812345678', 'phone', 'partial') === '138****5678';
+  });
+  t('maskValue full phone', function() {
+    return maskValue('13812345678', 'phone', 'full') === '***********';
+  });
+  t('maskValue partial idcard', function() {
+    return maskValue('110101199003071234', 'idcard', 'partial') === '110101********1234';
+  });
+  t('maskValue partial name', function() {
+    return maskValue('张三', 'name', 'partial') === '张*';
+  });
+  t('maskValue full name', function() {
+    return maskValue('欧阳娜娜', 'name', 'full') === '****';
+  });
+  t('maskValue partial email', function() {
+    var r = maskValue('test@example.com', 'email', 'partial');
+    return r === 't***@example.com';
+  });
+  t('maskValue none mode', function() {
+    return maskValue('13812345678', 'phone', 'none') === '13812345678';
+  });
+  t('maskValue empty value', function() {
+    return maskValue('', 'phone', 'partial') === '';
+  });
+
+  // PII registry tests
+  t('PII_REGISTRY has all 7 types', function() {
+    var keys = Object.keys(PII_REGISTRY);
+    return keys.length >= 7;
+  });
+  t('registerPIIType custom', function() {
+    registerPIIType({
+      type: '_test_custom',
+      headers: ['测试列'],
+      detector: function(v) { return { confidence: 1, count: v.length }; },
+      maskers: { partial: function(v) { return 'TEST'; }, full: function(v) { return 'FULL'; } },
+      icon: '🧪', label: '测试类型', color: '#000'
+    });
+    return PII_REGISTRY['_test_custom'] && PII_HEADERS['_test_custom'][0] === '测试列' && PII_LABELS['_test_custom'] === '🧪 测试类型';
+  });
+
+  // Output
+  var passed = results.filter(function(r) { return r.pass; }).length;
+  var total = results.length;
+  var color = passed === total ? 'green' : passed >= total * 0.7 ? 'orange' : 'red';
+  console.log('%c📋 DataVeil Tests: ' + passed + '/' + total + ' passed', 'font-size:16px;font-weight:bold;color:' + color);
+  results.forEach(function(r) {
+    console.log(r.pass ? '  ✅' : '  ❌', r.name, r.error ? '(' + r.error + ')' : '');
+  });
+  if (passed < total) console.warn('⚠ ' + (total - passed) + ' tests failed — review before publishing');
+  else console.log('✅ All tests passed!');
 }
 
 // ── START ──
