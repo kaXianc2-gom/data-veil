@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PII数据脱敏工具 — 身份证/手机号/银行卡/地址自动打码，数据不上传，浏览器本地处理">
+<meta name="theme-color" content="#3b82f6">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 <title>DataVeil 数据面纱 — 隐私优先的PII数据脱敏工具</title>
 <style>
 /* ═══════════════════════════════════════════════
@@ -539,7 +542,7 @@ tbody tr:hover { background: var(--accent-light); }
     </div>
     <div class="header-right">
       <span class="data-badge" id="dataBadge">📊 就绪</span>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+      <button class="theme-toggle" id="themeToggle" title="切换主题" aria-label="切换暗色/亮色主题">🌙</button>
     </div>
   </div>
 
@@ -775,7 +778,7 @@ function esc(str) {
 
 function toast(msg, type) {
   var el = document.createElement('div');
-  el.className = 'toast' + (type === 'success' ? ' success' : type === 'warn' ? ' warn' : '');
+  el.setAttribute('role','status');el.className = 'toast' + (type === 'success' ? ' success' : type === 'warn' ? ' warn' : '');
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(function() { el.style.animation = 'toastOut 0.3s ease forwards'; }, 1800);
@@ -1809,7 +1812,7 @@ function renderDashboard() {
     for (var w = 0; w < riskList.length; w++) {
       warnHTML += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--masked-bg);border-radius:8px;margin:4px 0">' +
         '<span style="font-size:12px">⚠ <strong>' + esc(riskList[w].col) + '</strong> — ' + (PII_LABELS[riskList[w].type] || riskList[w].type) + ' 脱敏已关闭</span>' +
-        '<button class="btn btn-sm" onclick="applyRuleChange(\'' + esc(riskList[w].col).replace(/'/g,"\\'") + '\',\'enabled\',true)" style="background:var(--success);color:#fff">启用</button>' +
+        '<button class="btn btn-sm" data-action="applyRuleChange" data-col="' + esc(riskList[w].col).replace(/'/g,"\\'") + '" data-prop="enabled" data-val="true" style="background:var(--success);color:#fff">启用</button>' +
         '</div>';
     }
     fixBtn.style.display = 'inline-block';
@@ -1860,8 +1863,8 @@ function showExportWarning(riskCols) {
     '<label for="chkRiskAck">我已知晓风险，确认导出包含明文 PII 的文件</label>' +
     '</div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">' +
-    '<button class="btn btn-sm" onclick="closeModal()">取消</button>' +
-    '<button class="btn btn-sm" id="btnExportProceed" disabled onclick="closeModal();doExport()" style="background:var(--danger);color:#fff">⚠ 风险确认，继续导出</button>' +
+    '<button class="btn btn-sm" data-action="closeModal">取消</button>' +
+    '<button class="btn btn-sm" id="btnExportProceed" disabled data-action="doExport" style="background:var(--danger);color:#fff">⚠ 风险确认，继续导出</button>' +
     '</div>';
 
   openModal('导出安全警告', html);
@@ -2064,12 +2067,12 @@ function addLog(msg, type) {
 // ── PERSISTENCE ──
 function loadSettings() {
   try {
-    var s = localStorage.getItem('dataveil_settings');
+    var s = localStorage.getItem('gwy_dataveil_settings') || localStorage.getItem('dataveil_settings');
     return s ? JSON.parse(s) : {};
   } catch(e) { return {}; }
 }
 function saveSettings() {
-  try { localStorage.setItem('dataveil_settings', JSON.stringify(STATE.settings)); } catch(e) {}
+  try { localStorage.setItem('gwy_dataveil_settings', JSON.stringify(STATE.settings)); } catch(e) {}
 }
 
 // ── INIT ──
@@ -2154,6 +2157,17 @@ function init() {
   // Modal
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalOverlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+  // Event delegation for modal buttons (replaces inline onclick)
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    if (action === 'closeModal') closeModal();
+    if (action === 'doExport') { closeModal(); doExport(); }
+    if (action === 'applyRuleChange') {
+      applyRuleChange(btn.getAttribute('data-col'), btn.getAttribute('data-prop'), btn.getAttribute('data-val') === 'true');
+    }
+  });
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       if (STATE.auditMode) { disableAuditMode(); return; }
