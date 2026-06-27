@@ -381,6 +381,9 @@ tbody tr:hover { background: var(--accent-light); }
 @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
 @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(16px) scale(0.92)} to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} }
 @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(-50%) translateY(-8px)} }
+@keyframes tabReveal{ from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes countUp{ from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.stat-anim{ animation:countUp 0.4s ease }
 @keyframes uploadBreathe {
   0%,100%{border-color:var(--primary);box-shadow:0 0 0 0 rgba(59,130,246,0.15)}
   50%{border-color:var(--accent);box-shadow:0 0 0 8px rgba(59,130,246,0)}
@@ -1769,6 +1772,11 @@ function updateStatsUI() {
   }
   for (var t in enabledTypes) typeCount++;
 
+  var el, els = ['statRows','statPII','statCols','statTypes'];
+  els.forEach(function(id) {
+    el = document.getElementById(id);
+    if (el) { el.classList.remove('stat-anim'); void el.offsetWidth; el.classList.add('stat-anim'); }
+  });
   document.getElementById('statRows').textContent = formatNum(STATE.meta.rowCount);
   document.getElementById('statPII').textContent = formatNum(STATE.meta.maskedCells);
   document.getElementById('statCols').textContent = STATE.columns.length;
@@ -1939,13 +1947,21 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-tab') === name);
   });
-  document.getElementById('tab-preview').style.display = name === 'preview' ? 'block' : 'none';
-  document.getElementById('tab-rules').style.display = name === 'rules' ? 'block' : 'none';
-  document.getElementById('tab-stats').style.display = name === 'stats' ? 'block' : 'none';
-
+  var tabs = ['preview','rules','stats','dashboard'];
+  tabs.forEach(function(t) {
+    var el = document.getElementById('tab-' + t);
+    if (!el) return;
+    if (t === name) {
+      el.style.display = 'block';
+      el.style.animation = 'none';
+      el.offsetHeight;
+      el.style.animation = 'tabReveal 0.3s ease';
+    } else {
+      el.style.display = 'none';
+    }
+  });
   document.getElementById('tab-rules').classList.toggle('visible', name === 'rules');
   document.getElementById('tab-stats').classList.toggle('visible', name === 'stats');
-  document.getElementById('tab-dashboard').style.display = name === 'dashboard' ? 'block' : 'none';
 
   if (name === 'rules') renderRulesPanel();
   if (name === 'stats') renderStatsPanel();
