@@ -3,7 +3,8 @@
 > 隐私优先的浏览器端 PII 数据脱敏工具 — 纯本地、单 HTML 文件、零服务器
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-brightgreen)](https://github.com/kaXianc2-gom/data-veil/releases)
+[![Version](https://img.shields.io/badge/version-1.5.0-brightgreen)](https://github.com/kaXianc2-gom/data-veil/releases)
+[![Pages](https://img.shields.io/badge/demo-online-0078D4)](https://kaXianc2-gom.github.io/data-veil/)
 
 **DataVeil** 是一个纯浏览器端运行的 PII（个人敏感信息）脱敏工具。不需要安装、不需要服务器、不需要注册——下载 HTML 文件，双击即用。所有数据均在本地处理，**绝不上传**。
 
@@ -69,6 +70,14 @@
 5. **调整**规则（可选）→ 点击 **「下载脱敏文件」**
 
 没有任何安装步骤，不需要命令行，不需要 Python。
+
+---
+
+## 🌐 在线体验
+
+无需下载，直接使用：**[🔗 在线 Demo](https://kaXianc2-gom.github.io/data-veil/)**
+
+> ⚠️ 在线版同样纯本地运行，所有数据仅在浏览器内存中处理，不会上传到任何服务器。
 
 ---
 
