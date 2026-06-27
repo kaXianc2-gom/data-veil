@@ -23,7 +23,7 @@
   --radius: 20px; --radius-sm: 12px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-lg: 0 10px 30px rgba(0,0,0,0.08), 0 4px 6px rgba(0,0,0,0.04);
-  --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+  --spring: 0.25s cubic-bezier(0.4,0,0.2,1);
   --glass-blur: blur(14px);
 }
 [data-theme="dark"] {
@@ -161,7 +161,8 @@ a { color: var(--primary); text-decoration: none; }
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
 }
-.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(0.97); transition: all 0.08s; }
 .btn-primary {
   background: var(--primary); color: #fff; border-color: var(--primary);
 }
@@ -378,7 +379,7 @@ tbody tr:hover { background: var(--accent-light); }
 /* ═══════════ ANIMATIONS ═══════════ */
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-@keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(16px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+@keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(16px) scale(0.92)} to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} }
 @keyframes toastOut { from{opacity:1} to{opacity:0;transform:translateX(-50%) translateY(-8px)} }
 @keyframes uploadBreathe {
   0%,100%{border-color:var(--primary);box-shadow:0 0 0 0 rgba(59,130,246,0.15)}
@@ -524,6 +525,7 @@ tbody tr:hover { background: var(--accent-light); }
 .page-exit-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg);opacity:0;pointer-events:none;transition:opacity 0.3s ease}.page-exit-overlay.go{opacity:1;pointer-events:all}
 
 </style>
+<script id="demoData" type="application/json">[{"姓名":"张三","手机号":"13812345678","身份证号码":"110101199003071234","银行卡号":"6222021234567890123","邮箱":"zhangsan@example.com","家庭住址":"北京市海淀区中关村大街1号","车牌号":"京A12345","部门":"技术部","备注":"无"},{"姓名":"李四","手机号":"13998765432","身份证号码":"320106198507152345","银行卡号":"6228480012345678912","邮箱":"lisi@test.cn","家庭住址":"上海市浦东新区陆家嘴环路100号","车牌号":"沪B67890","部门":"市场部","备注":"实习"},{"姓名":"王五","手机号":"15612349876","身份证号码":"440301199212018765","银行卡号":"6217001234567890432","邮箱":"wangwu@mail.com","家庭住址":"广东省广州市天河区体育西路200号","车牌号":"粤C11111","部门":"财务部","备注":""},{"姓名":"赵六","手机号":"18887654321","身份证号码":"510107199506154321","银行卡号":"6226091234567890543","邮箱":"zhaoliu@company.org","家庭住址":"四川省成都市武侯区人民南路三段1号","车牌号":"川A99999","部门":"人事部","备注":"试用期"},{"姓名":"孙七","手机号":"17711223344","身份证号码":"330102198811221098","银行卡号":"6212261234567890765","邮箱":"sunqi@work.cn","家庭住址":"浙江省杭州市西湖区文三路500号","车牌号":"浙D54321","部门":"研发中心","备注":"高级"},{"姓名":"周八","手机号":"13544556677","身份证号码":"430102199706015678","银行卡号":"6210981234567890987","邮箱":"zhouba@office.com","家庭住址":"湖南省长沙市岳麓区麓谷大道888号","车牌号":"湘E13579","部门":"","备注":"离职"},{"姓名":"欧阳娜娜","手机号":"19912345678","身份证号码":"37010220001231002X","银行卡号":"6225881234567890123","邮箱":"ouyang@test.com","家庭住址":"山东省济南市历下区","车牌号":"鲁F24680","部门":"行政部","备注":"身份证号末位X"},{"姓名":"张三丰","手机号":"","身份证号码":"","银行卡号":"","邮箱":"","家庭住址":"","车牌号":"","部门":"","备注":"全空行测试"}]</script>
 </head>
 <body>
 
@@ -564,6 +566,10 @@ tbody tr:hover { background: var(--accent-light); }
     <div class="upload-text">拖拽 Excel / CSV 文件到此处 或 点击选择</div>
     <div class="upload-hint">支持 .xlsx · .xls · .csv ｜ 数据不上传服务器，全部本地处理</div>
     <input type="file" id="fileInput" hidden accept=".xlsx,.xls,.csv" multiple>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+    <button class="btn btn-outline btn-sm" id="btnDemo" style="font-size:13px">🎯 试玩示例数据</button>
+    <span style="font-size:12px;color:var(--muted)">8 条含 PII 示例数据 · 无需上传即时体验</span>
   </div>
 
   <!-- ═══════════ LAYOUT GRID ═══════════ -->
@@ -806,6 +812,25 @@ function openModal(title, bodyHTML) {
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 
 // ── FILE UPLOAD & PARSING ──
+// ── Demo data loader ──
+var DEMO_DATA = null;
+function loadDemoData() {
+  if (DEMO_DATA === null) {
+    try {
+      var el = document.getElementById('demoData');
+      if (el && el.textContent.trim()) DEMO_DATA = JSON.parse(el.textContent.trim());
+    } catch(e) { console.error('Demo parse error', e); }
+  }
+  if (!DEMO_DATA || !DEMO_DATA.length) {
+    toast('示例数据不可用，请上传文件', 'warn');
+    return;
+  }
+  STATE.raw = DEMO_DATA.slice();
+  finishUpload();
+  toast('示例数据已加载 · ' + STATE.raw.length + ' 行 · ' + STATE.columns.length + ' 列', 'success');
+}
+document.getElementById('btnDemo').addEventListener('click', loadDemoData);
+
 function handleFiles(files) {
   if (!files || !files.length) return;
 
